@@ -24,6 +24,7 @@ public class DashboardController {
     @FXML private Label roleLabel;
     @FXML private VBox contentArea;
     @FXML private Button btnPatientsList;
+    @FXML private Button btnAdminPanel;
 
     private User loggedInUser;
 
@@ -55,10 +56,17 @@ public class DashboardController {
         if ("patient".equals(role)) {
             btnPatientsList.setVisible(false);
             btnPatientsList.setManaged(false);
+            btnAdminPanel.setVisible(false);
+            btnAdminPanel.setManaged(false);
             // Default module for patients is their own metrics
             onShowMetrics();
+        } else if ("admin".equals(role)) {
+            // Admin sees the patient list and the exclusive admin panel
+            onShowAdmin();
         } else {
-            // Default module for doctors/admins is the patient list
+            // Doctor sees the patient list but not the admin panel
+            btnAdminPanel.setVisible(false);
+            btnAdminPanel.setManaged(false);
             onShowPatientsList();
         }
     }
@@ -66,6 +74,11 @@ public class DashboardController {
     @FXML
     protected void onShowPatientsList() {
         changeModule("/com/itc/healthtrack/views/patients-view.fxml", "patients");
+    }
+
+    @FXML
+    protected void onShowAdmin() {
+        changeModule("/com/itc/healthtrack/views/admin-view.fxml", "admin");
     }
 
     @FXML
@@ -92,6 +105,10 @@ public class DashboardController {
             Node node = loader.load();
 
             switch (moduleType) {
+                case "admin":
+                    AdminController ac = loader.getController();
+                    ac.initData(loggedInUser);
+                    break;
                 case "patients":
                     PatientsController pc = loader.getController();
                     pc.initData(loggedInUser);
