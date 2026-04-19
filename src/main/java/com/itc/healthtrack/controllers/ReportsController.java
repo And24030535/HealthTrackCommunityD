@@ -124,7 +124,10 @@ public class ReportsController {
         // Escribir el encabezado del documento
         document.add(new Paragraph("Reporte Clínico - HealthTrack Community").setBold().setFontSize(18));
         document.add(new Paragraph("Paciente: " + patient.getFirstName() + " " + patient.getLastName()));
-        document.add(new Paragraph("Médico a cargo: " + loggedInDoctor.getFirstName() + " " + loggedInDoctor.getLastName()));
+        if (loggedInDoctor != null
+                && ("doctor".equals(loggedInDoctor.getRole()) || "admin".equals(loggedInDoctor.getRole()))) {
+            document.add(new Paragraph("Médico a cargo: " + loggedInDoctor.getFirstName() + " " + loggedInDoctor.getLastName()));
+        }
         document.add(new Paragraph(" ")); // Salto de linea
 
         // Configurar una tabla con 5 columnas
@@ -219,8 +222,11 @@ public class ReportsController {
         Row patientRow = sheet.createRow(1);
         patientRow.createCell(0).setCellValue("Paciente: " + patient.getFirstName() + " " + patient.getLastName());
 
-        Row doctorRow = sheet.createRow(2);
-        doctorRow.createCell(0).setCellValue("Médico a cargo: " + loggedInDoctor.getFirstName() + " " + loggedInDoctor.getLastName());
+        if (loggedInDoctor != null
+                && ("doctor".equals(loggedInDoctor.getRole()) || "admin".equals(loggedInDoctor.getRole()))) {
+            Row doctorRow = sheet.createRow(2);
+            doctorRow.createCell(0).setCellValue("Médico a cargo: " + loggedInDoctor.getFirstName() + " " + loggedInDoctor.getLastName());
+        }
 
         // Encabezados de la tabla
         Row headerRow = sheet.createRow(4);

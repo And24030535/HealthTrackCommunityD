@@ -85,8 +85,10 @@ public class RegisterController {
                     try {
                         newUser.setHeight(Double.parseDouble(heightText));
                     } catch (NumberFormatException e) {
-                        Platform.runLater(() -> showStatus("Altura inválida. Verifica que sea un número decimal (ej: 1.75).", false));
-                        btnRegister.setDisable(false);
+                        Platform.runLater(() -> {
+                            showStatus("Altura inválida. Verifica que sea un número decimal (ej: 1.75).", false);
+                            btnRegister.setDisable(false);
+                        });
                         return;
                     }
                 }

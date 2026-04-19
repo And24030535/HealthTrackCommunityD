@@ -253,8 +253,8 @@ public class MetricsController {
         if (sysCount > 0)    avgSeries.getData().add(new XYChart.Data<>("Sistólica",  sysTotal    / (double) sysCount));
         if (diaCount > 0)    avgSeries.getData().add(new XYChart.Data<>("Diastólica", diaTotal    / (double) diaCount));
         if (hrCount > 0)     avgSeries.getData().add(new XYChart.Data<>("F. Cardíaca", hrTotal    / (double) hrCount));
-        if (glCount > 0)     avgSeries.getData().add(new XYChart.Data<>("Glucosa",    glTotal     / glCount));
-        if (weightCount > 0) avgSeries.getData().add(new XYChart.Data<>("Peso (kg)",  weightTotal / weightCount));
+        if (glCount > 0)     avgSeries.getData().add(new XYChart.Data<>("Glucosa",    glTotal     / (double) glCount));
+        if (weightCount > 0) avgSeries.getData().add(new XYChart.Data<>("Peso (kg)",  weightTotal / (double) weightCount));
 
         averagesChart.getData().add(avgSeries);
     }
@@ -396,7 +396,8 @@ public class MetricsController {
             User patient = comboPatients.getValue();
             if (patient != null) {
                 notificationService.notifyPatient(patient, "Valores clínicos críticos detectados en tu última medición. Consulta a tu médico.");
-                if (loggedInDoctor != null) {
+                if (loggedInDoctor != null
+                        && ("doctor".equals(loggedInDoctor.getRole()) || "admin".equals(loggedInDoctor.getRole()))) {
                     notificationService.notifyDoctor(loggedInDoctor, "ALERTA: El paciente " + patient.getFirstName() + " " + patient.getLastName() + " tiene valores críticos registrados.");
                 }
             }
