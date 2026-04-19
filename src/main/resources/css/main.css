@@ -175,8 +175,35 @@
 }
 
 /* =========================================
-   Gráficos Estadísticos
+   Tab Pane (Servicios Externos)
    ========================================= */
+.tab-pane {
+    -fx-background-color: transparent;
+}
+
+.tab-pane .tab-header-area .tab-header-background {
+    -fx-background-color: #1e1e1e;
+}
+
+.tab-pane .tab {
+    -fx-background-color: #2c2c2c;
+    -fx-border-color: #444444;
+    -fx-border-width: 1;
+}
+
+.tab-pane .tab:selected {
+    -fx-background-color: #3f51b5;
+}
+
+.tab-pane .tab .tab-label {
+    -fx-text-fill: #e0e0e0;
+}
+
+.tab-pane .tab-content-area {
+    -fx-background-color: transparent;
+    -fx-border-color: #444444;
+    -fx-border-width: 1;
+}
 .chart-title {
     -fx-text-fill: #ffffff;
 }

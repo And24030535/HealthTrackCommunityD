@@ -1,15 +1,21 @@
 package com.itc.healthtrack.controllers;
 
+import com.google.cloud.Timestamp;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.itc.healthtrack.dao.MetricDAO;
 import com.itc.healthtrack.dao.PatientDAO;
+import com.itc.healthtrack.dao.RecommendationDAO;
 import com.itc.healthtrack.models.Metric;
+import com.itc.healthtrack.models.Recommendation;
 import com.itc.healthtrack.models.User;
 import com.itc.healthtrack.services.NotificationService;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.TextArea;
+import javafx.scene.control.*;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -23,22 +29,69 @@ public class RecommendationsController {
     @FXML private ComboBox<User> comboPatients;
     @FXML private TextArea txtRecommendations;
     @FXML private TextArea txtWebService;
+    @FXML private TextArea txtNutrition;
+    @FXML private ListView<Recommendation> listHistory;
 
     private final PatientDAO patientDAO = new PatientDAO();
     private final MetricDAO metricDAO = new MetricDAO();
+    private final RecommendationDAO recommendationDAO = new RecommendationDAO();
     private final NotificationService notificationService = new NotificationService();
     private User loggedInDoctor;
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
+    private ObservableList<Recommendation> historyItems;
+
     public void initData(User doctor) {
         this.loggedInDoctor = doctor;
+        setupHistory();
+
         if ("patient".equals(doctor.getRole())) {
             comboPatients.getItems().add(doctor);
             comboPatients.getSelectionModel().selectFirst();
             comboPatients.setDisable(true);
+            loadRecommendationHistory(doctor.getUid());
         } else {
             loadPatients();
+            // Reload history whenever the selected patient changes
+            comboPatients.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+                if (newVal != null) {
+                    historyItems.clear();
+                    loadRecommendationHistory(newVal.getUid());
+                }
+            });
         }
+    }
+
+    /**
+     * Configures the ListView that shows past saved recommendations.
+     * Clicking a past item restores its full text in the main TextArea.
+     */
+    private void setupHistory() {
+        historyItems = FXCollections.observableArrayList();
+        listHistory.setItems(historyItems);
+
+        listHistory.setCellFactory(lv -> new ListCell<Recommendation>() {
+            @Override
+            protected void updateItem(Recommendation item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle(null);
+                } else {
+                    String date = item.getGeneratedAt() != null
+                            ? item.getGeneratedAt().toDate().toString().substring(0, 16) : "";
+                    setText((item.getTitle() != null ? item.getTitle() : "Análisis") + "\n" + date);
+                    setStyle("-fx-text-fill: #e0e0e0; -fx-font-size: 12px;");
+                }
+            }
+        });
+
+        // Show the stored analysis text when a history entry is selected
+        listHistory.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null && newVal.getMessage() != null) {
+                txtRecommendations.setText(newVal.getMessage());
+            }
+        });
     }
 
     private void loadPatients() {
@@ -53,6 +106,24 @@ public class RecommendationsController {
         }).start();
     }
 
+    /**
+     * Loads past recommendations for the given patient and populates listHistory.
+     */
+    private void loadRecommendationHistory(String patientId) {
+        new Thread(() -> {
+            try {
+                List<Recommendation> history = recommendationDAO.getRecommendationsByPatient(patientId);
+                Platform.runLater(() -> {
+                    historyItems.clear();
+                    historyItems.addAll(history);
+                });
+            } catch (Exception e) {
+                System.err.println("Error loading recommendation history: " + e.getMessage());
+            }
+        }).start();
+    }
+
+
     @FXML
     protected void onAnalyzePatient() {
         User selected = comboPatients.getValue();
@@ -60,6 +131,7 @@ public class RecommendationsController {
 
         txtRecommendations.setText("Analizando datos del paciente...");
         txtWebService.setText("Consultando servicios externos...");
+        txtNutrition.setText("Consultando USDA FoodData Central...");
 
         new Thread(() -> {
             try {
@@ -81,9 +153,18 @@ public class RecommendationsController {
                     }
                 }
 
+                // Persist analysis to Firestore and refresh history list after saving
+                persistRecommendation(selected.getUid(), analysis);
+
+                // Fetch FDA data (async, updates txtWebService internally)
                 fetchExternalMedicalData();
 
+                // Fetch nutritional advice based on latest metric values
+                String foodQuery = determineFoodQuery(history);
+                fetchNutritionalData(foodQuery);
+
                 Platform.runLater(() -> txtRecommendations.setText(analysis));
+
             } catch (Exception e) {
                 Platform.runLater(() -> txtRecommendations.setText("Error al procesar el análisis."));
                 e.printStackTrace();
@@ -291,5 +372,144 @@ public class RecommendationsController {
                             "Fallo en la conexión al Web Service externo.\n" + e.getMessage()));
                     return null;
                 });
+    }
+
+    /**
+     * Saves the generated clinical analysis as a Recommendation document in Firestore.
+     * Reloads the history list after the record is committed.
+     *
+     * @param patientId    UID of the patient the analysis belongs to.
+     * @param analysisText Full text generated by the recommendation engine.
+     */
+    private void persistRecommendation(String patientId, String analysisText) {
+        new Thread(() -> {
+            try {
+                Recommendation rec = new Recommendation();
+                rec.setPatientId(patientId);
+                rec.setGeneratedAt(Timestamp.now());
+                rec.setType("suggestion");
+                rec.setTitle("Análisis Clínico Automático");
+                rec.setMessage(analysisText);
+                rec.setIsRead(false);
+                recommendationDAO.saveRecommendation(rec);
+                // Refresh the history list once the save is confirmed
+                loadRecommendationHistory(patientId);
+            } catch (Exception e) {
+                System.err.println("Error persisting recommendation: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    /**
+     * Chooses a nutritional search query that matches the patient's latest clinical values.
+     *
+     * @param history Patient metric history (newest first).
+     * @return A food search query string for the USDA API.
+     */
+    private String determineFoodQuery(List<Metric> history) {
+        if (history == null || history.isEmpty()) {
+            return "mediterranean diet healthy foods";
+        }
+        Metric latest = history.get(0);
+
+        if (latest.getGlucoseLevel() != null && latest.getGlucoseLevel() > 125) {
+            return "low glycemic index vegetables";
+        }
+        if (latest.getSystolic() != null && latest.getSystolic() >= 140) {
+            return "low sodium DASH diet foods";
+        }
+        if (latest.getBmi() != null && latest.getBmi() >= 30) {
+            return "low calorie high fiber foods";
+        }
+        return "mediterranean diet healthy foods";
+    }
+
+    /**
+     * Asynchronously queries the USDA FoodData Central public API for nutritional
+     * information about foods relevant to the patient's condition.
+     *
+     * @param foodQuery Search term derived from the patient's latest metrics.
+     */
+    private void fetchNutritionalData(String foodQuery) {
+        Platform.runLater(() -> txtNutrition.setText("Consultando USDA FoodData Central..."));
+
+        String encodedQuery = foodQuery.replace(" ", "%20");
+        String url = "https://api.nal.usda.gov/fdc/v1/foods/search?query="
+                + encodedQuery + "&api_key=DEMO_KEY&pageSize=3";
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(10))
+                .GET()
+                .build();
+
+        httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(HttpResponse::body)
+                .thenAccept(responseBody -> {
+                    String parsed = parseNutritionalResponse(responseBody, foodQuery);
+                    Platform.runLater(() -> txtNutrition.setText(parsed));
+                })
+                .exceptionally(e -> {
+                    Platform.runLater(() -> txtNutrition.setText(
+                            "Error al conectar con USDA FoodData Central.\n" + e.getMessage()));
+                    return null;
+                });
+    }
+
+    /**
+     * Parses the JSON response from the USDA FoodData Central API and formats
+     * the top results with their main macronutrient values.
+     *
+     * @param jsonBody     Raw JSON string returned by the API.
+     * @param query        The original food query used for display purposes.
+     * @return Human-readable nutritional summary.
+     */
+    private String parseNutritionalResponse(String jsonBody, String query) {
+        try {
+            JsonObject root = JsonParser.parseString(jsonBody).getAsJsonObject();
+            JsonArray foods = root.has("foods") ? root.getAsJsonArray("foods") : null;
+
+            if (foods == null || foods.size() == 0) {
+                return "No se encontraron resultados nutricionales para: " + query;
+            }
+
+            StringBuilder result = new StringBuilder();
+            result.append("=== USDA FoodData Central ===\n");
+            result.append("Búsqueda: ").append(query).append("\n\n");
+
+            for (int i = 0; i < Math.min(3, foods.size()); i++) {
+                JsonObject food = foods.get(i).getAsJsonObject();
+                String description = food.has("description")
+                        ? food.get("description").getAsString() : "N/A";
+                result.append("• ").append(description).append("\n");
+
+                if (food.has("foodNutrients")) {
+                    JsonArray nutrients = food.getAsJsonArray("foodNutrients");
+                    for (int j = 0; j < nutrients.size(); j++) {
+                        JsonObject nutrient = nutrients.get(j).getAsJsonObject();
+                        if (!nutrient.has("nutrientName") || !nutrient.has("value")) continue;
+                        String name = nutrient.get("nutrientName").getAsString();
+                        if (name.equals("Energy")
+                                || name.equals("Protein")
+                                || name.equals("Carbohydrate, by difference")
+                                || name.equals("Total lipid (fat)")) {
+                            double value = nutrient.get("value").getAsDouble();
+                            String unit = nutrient.has("unitName")
+                                    ? nutrient.get("unitName").getAsString() : "";
+                            result.append("  - ").append(name)
+                                    .append(": ").append(value)
+                                    .append(" ").append(unit).append("\n");
+                        }
+                    }
+                }
+                result.append("\n");
+            }
+
+            result.append("Fuente: USDA FoodData Central (api.nal.usda.gov)");
+            return result.toString();
+
+        } catch (Exception e) {
+            return "Error al procesar la respuesta nutricional: " + e.getMessage();
+        }
     }
 }
