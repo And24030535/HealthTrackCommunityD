@@ -22,6 +22,8 @@ public class HealthTrackApplication extends Application {
 
         // Se inyecta la libreria BootstrapFX para mejorar el aspecto de los botones y campos
         scene.getStylesheets().add(BootstrapFX.bootstrapFXStylesheet());
+        String cssPath = HealthTrackApplication.class.getResource("/css/main.css").toExternalForm();
+        scene.getStylesheets().add(cssPath);
 
         stage.setTitle("HealthTrack Community - Login");
         stage.setScene(scene);

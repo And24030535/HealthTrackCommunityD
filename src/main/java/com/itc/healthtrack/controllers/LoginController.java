@@ -30,6 +30,26 @@ public class LoginController {
     private final UserDAO userDAO = new UserDAO();
 
     /**
+     * Navigates to the self-registration screen.
+     */
+    @FXML
+    protected void onGoToRegister(ActionEvent event) {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/itc/healthtrack/views/register-view.fxml"));
+            Scene scene = new Scene(loader.load(), 800, 700);
+            scene.getStylesheets().add(BootstrapFX.bootstrapFXStylesheet());
+            String cssPath = getClass().getResource("/css/main.css").toExternalForm();
+            scene.getStylesheets().add(cssPath);
+            Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
+            stage.setScene(scene);
+            stage.centerOnScreen();
+        } catch (IOException e) {
+            e.printStackTrace();
+            showError("Error al cargar la pantalla de registro.");
+        }
+    }
+
+    /**
      * Procesa el intento de inicio de sesion.
      */
     @FXML

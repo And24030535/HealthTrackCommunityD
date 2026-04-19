@@ -21,6 +21,7 @@
                 </font>
             </Label>
             <Label maxWidth="Infinity" HBox.hgrow="ALWAYS" />
+            <Label fx:id="roleLabel" text="" textFill="#aaaaaa" style="-fx-padding: 0 10 0 0;" />
             <Label fx:id="userNameLabel" text="Nombre de Usuario" textFill="WHITE" />
         </HBox>
     </top>
@@ -30,7 +31,7 @@
             <padding>
                 <Insets bottom="20.0" left="10.0" right="10.0" top="20.0" />
             </padding>
-            <Button maxWidth="Infinity" mnemonicParsing="false" onAction="#onShowPatientsList" styleClass="btn, btn-default" text="Lista de Pacientes" />
+            <Button fx:id="btnPatientsList" maxWidth="Infinity" mnemonicParsing="false" onAction="#onShowPatientsList" styleClass="btn, btn-default" text="Lista de Pacientes" />
             <Button maxWidth="Infinity" mnemonicParsing="false" onAction="#onShowMetrics" styleClass="btn, btn-default" text="Métricas y Gráficos" />
             <Button maxWidth="Infinity" mnemonicParsing="false" onAction="#onShowReports" styleClass="btn, btn-default" text="Reportes Clínicos" />
             <Button maxWidth="Infinity" mnemonicParsing="false" onAction="#onShowRecommendations" styleClass="btn, btn-default" text="Inteligencia Clínica" />

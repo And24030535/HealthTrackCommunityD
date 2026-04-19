@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<StackPane style="-fx-background-color: #121212;" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.itc.healthtrack.controllers.RegisterController">
+
+    <VBox alignment="CENTER" maxWidth="480.0" spacing="20.0" styleClass="panel-secundario" style="-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.6), 20, 0, 0, 5); -fx-padding: 40; -fx-background-radius: 10; -fx-border-radius: 10;">
+
+        <VBox alignment="CENTER" spacing="5.0">
+            <FontIcon iconColor="#4caf50" iconLiteral="fas-user-plus" iconSize="40" />
+            <Label text="Crear Cuenta" textFill="WHITE">
+                <font>
+                    <Font name="System Bold" size="28.0" />
+                </font>
+            </Label>
+            <Label text="HealthTrack Community" textFill="#aaaaaa">
+                <font>
+                    <Font size="14.0" />
+                </font>
+            </Label>
+        </VBox>
+
+        <Separator style="-fx-background-color: #333333;" />
+
+        <GridPane hgap="15" vgap="12">
+            <Label text="Nombre *:" textFill="#cccccc" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+            <TextField fx:id="txtFirstName" promptText="Nombre" GridPane.columnIndex="1" GridPane.rowIndex="0" styleClass="form-control"/>
+
+            <Label text="Apellido *:" textFill="#cccccc" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+            <TextField fx:id="txtLastName" promptText="Apellido" GridPane.columnIndex="1" GridPane.rowIndex="1" styleClass="form-control"/>
+
+            <Label text="Correo *:" textFill="#cccccc" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+            <TextField fx:id="txtEmail" promptText="usuario@correo.com" GridPane.columnIndex="1" GridPane.rowIndex="2" styleClass="form-control"/>
+
+            <Label text="Contraseña *:" textFill="#cccccc" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
+            <PasswordField fx:id="txtPassword" promptText="Mínimo 6 caracteres" GridPane.columnIndex="1" GridPane.rowIndex="3" styleClass="form-control"/>
+
+            <Label text="Confirmar *:" textFill="#cccccc" GridPane.columnIndex="0" GridPane.rowIndex="4"/>
+            <PasswordField fx:id="txtConfirmPassword" promptText="Repite la contraseña" GridPane.columnIndex="1" GridPane.rowIndex="4" styleClass="form-control"/>
+
+            <Label text="Rol *:" textFill="#cccccc" GridPane.columnIndex="0" GridPane.rowIndex="5"/>
+            <ComboBox fx:id="comboRole" maxWidth="Infinity" GridPane.columnIndex="1" GridPane.rowIndex="5" styleClass="form-control"/>
+
+            <Label text="Género:" textFill="#cccccc" GridPane.columnIndex="0" GridPane.rowIndex="6"/>
+            <ComboBox fx:id="comboGender" promptText="Seleccionar" maxWidth="Infinity" GridPane.columnIndex="1" GridPane.rowIndex="6" styleClass="form-control"/>
+
+            <Label text="Fecha Nac.:" textFill="#cccccc" GridPane.columnIndex="0" GridPane.rowIndex="7"/>
+            <TextField fx:id="txtBirthDate" promptText="AAAA-MM-DD" GridPane.columnIndex="1" GridPane.rowIndex="7" styleClass="form-control"/>
+
+            <Label text="Altura (m):" textFill="#cccccc" GridPane.columnIndex="0" GridPane.rowIndex="8"/>
+            <TextField fx:id="txtHeight" promptText="Ej: 1.75" GridPane.columnIndex="1" GridPane.rowIndex="8" styleClass="form-control"/>
+        </GridPane>
+
+        <Label fx:id="lblStatus" wrapText="true" visible="false">
+            <font>
+                <Font name="System Bold" size="12.0" />
+            </font>
+        </Label>
+
+        <Button fx:id="btnRegister" maxWidth="Infinity" mnemonicParsing="false" onAction="#onRegister" prefHeight="42.0" styleClass="btn-success" text="Registrarse" textFill="WHITE">
+            <font>
+                <Font name="System Bold" size="14.0" />
+            </font>
+            <graphic>
+                <FontIcon iconColor="white" iconLiteral="fas-check" iconSize="14" />
+            </graphic>
+        </Button>
+
+        <HBox alignment="CENTER" spacing="8.0">
+            <Label text="¿Ya tienes cuenta?" textFill="#aaaaaa" />
+            <Button mnemonicParsing="false" onAction="#onGoToLogin" styleClass="btn-primary" text="Iniciar Sesión" />
+        </HBox>
+
+    </VBox>
+</StackPane>

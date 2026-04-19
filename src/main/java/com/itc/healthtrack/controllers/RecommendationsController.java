@@ -32,7 +32,13 @@ public class RecommendationsController {
 
     public void initData(User doctor) {
         this.loggedInDoctor = doctor;
-        loadPatients();
+        if ("patient".equals(doctor.getRole())) {
+            comboPatients.getItems().add(doctor);
+            comboPatients.getSelectionModel().selectFirst();
+            comboPatients.setDisable(true);
+        } else {
+            loadPatients();
+        }
     }
 
     private void loadPatients() {
@@ -65,10 +71,14 @@ public class RecommendationsController {
                 if (hasRiskProgression(history)) {
                     notificationService.notifyPatient(selected,
                             "Análisis de tendencias detectó una progresión de riesgo en tus métricas. Consulta a tu médico.");
-                    notificationService.notifyDoctor(loggedInDoctor,
-                            "ALERTA DE TENDENCIA: El paciente " + selected.getFirstName()
-                                    + " " + selected.getLastName()
-                                    + " presenta una progresión de riesgo en sus métricas recientes.");
+                    // Only send the doctor notification when the logged-in user is a doctor or admin
+                    if (loggedInDoctor != null
+                            && ("doctor".equals(loggedInDoctor.getRole()) || "admin".equals(loggedInDoctor.getRole()))) {
+                        notificationService.notifyDoctor(loggedInDoctor,
+                                "ALERTA DE TENDENCIA: El paciente " + selected.getFirstName()
+                                        + " " + selected.getLastName()
+                                        + " presenta una progresión de riesgo en sus métricas recientes.");
+                    }
                 }
 
                 fetchExternalMedicalData();

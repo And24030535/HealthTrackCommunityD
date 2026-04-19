@@ -35,6 +35,9 @@
 
             <Label text="Altura (m):" GridPane.columnIndex="0" GridPane.rowIndex="5"/>
             <TextField fx:id="txtHeight" GridPane.columnIndex="1" GridPane.rowIndex="5" styleClass="form-control"/>
+
+            <Label text="Contraseña:" GridPane.columnIndex="0" GridPane.rowIndex="6"/>
+            <PasswordField fx:id="txtPassword" promptText="Contraseña de acceso" GridPane.columnIndex="1" GridPane.rowIndex="6" styleClass="form-control"/>
         </GridPane>
 
         <HBox spacing="10.0" alignment="CENTER">

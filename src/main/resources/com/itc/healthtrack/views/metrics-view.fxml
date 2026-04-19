@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.chart.BarChart?>
 <?import javafx.scene.chart.CategoryAxis?>
 <?import javafx.scene.chart.LineChart?>
 <?import javafx.scene.chart.NumberAxis?>
@@ -73,7 +74,7 @@
             <Label fx:id="lblAvgWeight" text="Peso: -- kg" textFill="#ff9800" />
         </HBox>
 
-        <TableView fx:id="tableMetrics" prefHeight="200.0" VBox.vgrow="ALWAYS">
+        <TableView fx:id="tableMetrics" prefHeight="180.0" VBox.vgrow="ALWAYS">
             <columns>
                 <TableColumn fx:id="colDate" text="Fecha y Hora" prefWidth="160"/>
                 <TableColumn fx:id="colSysDia" text="PA (Sis/Dia)" prefWidth="100"/>
@@ -86,7 +87,7 @@
             </columnResizePolicy>
         </TableView>
 
-        <LineChart fx:id="evolutionChart" title="Evolución de la Presión Arterial" prefHeight="250.0" VBox.vgrow="ALWAYS">
+        <LineChart fx:id="evolutionChart" title="Evolución de la Presión Arterial" prefHeight="200.0" VBox.vgrow="ALWAYS">
             <xAxis>
                 <CategoryAxis label="Línea de tiempo" side="BOTTOM" animated="false" />
             </xAxis>
@@ -94,5 +95,14 @@
                 <NumberAxis label="mmHg" side="LEFT" animated="false" />
             </yAxis>
         </LineChart>
+
+        <BarChart fx:id="averagesChart" title="Comparativa de Promedios del Período" prefHeight="200.0" VBox.vgrow="ALWAYS">
+            <xAxis>
+                <CategoryAxis label="Métrica" side="BOTTOM" animated="false" />
+            </xAxis>
+            <yAxis>
+                <NumberAxis label="Valor" side="LEFT" animated="false" />
+            </yAxis>
+        </BarChart>
     </VBox>
 </HBox>

@@ -11,6 +11,7 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
+import javafx.scene.chart.BarChart;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.*;
@@ -34,6 +35,7 @@ public class MetricsController {
     @FXML private TableView<Metric> tableMetrics;
     @FXML private TableColumn<Metric, String> colDate, colSysDia, colHeartRate, colGlucose, colWeight;
     @FXML private LineChart<String, Number> evolutionChart;
+    @FXML private BarChart<String, Number> averagesChart;
 
     // Acceso a la base de datos y variables de estado
     private final PatientDAO patientDAO = new PatientDAO();
@@ -45,19 +47,27 @@ public class MetricsController {
     private Metric selectedMetric = null;
     private List<Metric> currentPatientHistory = new ArrayList<>(); // Respaldo del historial completo
 
-    public void initData(User doctor) {
-        this.loggedInDoctor = doctor;
+    public void initData(User user) {
+        this.loggedInDoctor = user;
         setupTable();
-        loadPatientsIntoCombo();
         setupFilters();
 
-        // Escucha los cambios de selección de paciente
-        comboPatients.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            if (newVal != null) {
-                onClearForm();
-                loadMetricsForPatient(newVal.getUid());
-            }
-        });
+        if ("patient".equals(user.getRole())) {
+            // Patients can only view and log their own metrics
+            comboPatients.getItems().add(user);
+            comboPatients.getSelectionModel().selectFirst();
+            comboPatients.setDisable(true);
+            loadMetricsForPatient(user.getUid());
+        } else {
+            // Doctors and admins see a dropdown of assigned patients
+            loadPatientsIntoCombo();
+            comboPatients.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+                if (newVal != null) {
+                    onClearForm();
+                    loadMetricsForPatient(newVal.getUid());
+                }
+            });
+        }
     }
 
     private void setupFilters() {
@@ -139,6 +149,7 @@ public class MetricsController {
         if (currentPatientHistory.isEmpty()) {
             metricsObservableList.clear();
             evolutionChart.getData().clear();
+            averagesChart.getData().clear();
             calculateAverages(new ArrayList<>());
             return;
         }
@@ -161,6 +172,7 @@ public class MetricsController {
         metricsObservableList.clear();
         metricsObservableList.addAll(filteredList);
         updateChart(filteredList);
+        updateBarChart(filteredList);
         calculateAverages(filteredList);
     }
 
@@ -211,6 +223,40 @@ public class MetricsController {
         }
 
         evolutionChart.getData().addAll(systolicSeries, diastolicSeries);
+    }
+
+    /**
+     * Populates the BarChart with average values for the current period.
+     * Shows mean Systolic, Diastolic, Heart Rate, Glucose, and Weight side by side
+     * so the user can compare metric averages at a glance.
+     */
+    private void updateBarChart(List<Metric> history) {
+        averagesChart.getData().clear();
+
+        if (history.isEmpty()) return;
+
+        XYChart.Series<String, Number> avgSeries = new XYChart.Series<>();
+        avgSeries.setName("Promedio del período");
+
+        int sysTotal = 0, diaTotal = 0, hrTotal = 0;
+        double glTotal = 0, weightTotal = 0;
+        int sysCount = 0, diaCount = 0, hrCount = 0, glCount = 0, weightCount = 0;
+
+        for (Metric m : history) {
+            if (m.getSystolic() != null)     { sysTotal    += m.getSystolic();    sysCount++;    }
+            if (m.getDiastolic() != null)    { diaTotal    += m.getDiastolic();   diaCount++;    }
+            if (m.getHeartRate() != null)    { hrTotal     += m.getHeartRate();   hrCount++;     }
+            if (m.getGlucoseLevel() != null) { glTotal     += m.getGlucoseLevel(); glCount++;   }
+            if (m.getWeight() != null)       { weightTotal += m.getWeight();      weightCount++; }
+        }
+
+        if (sysCount > 0)    avgSeries.getData().add(new XYChart.Data<>("Sistólica",  sysTotal    / (double) sysCount));
+        if (diaCount > 0)    avgSeries.getData().add(new XYChart.Data<>("Diastólica", diaTotal    / (double) diaCount));
+        if (hrCount > 0)     avgSeries.getData().add(new XYChart.Data<>("F. Cardíaca", hrTotal    / (double) hrCount));
+        if (glCount > 0)     avgSeries.getData().add(new XYChart.Data<>("Glucosa",    glTotal     / (double) glCount));
+        if (weightCount > 0) avgSeries.getData().add(new XYChart.Data<>("Peso (kg)",  weightTotal / (double) weightCount));
+
+        averagesChart.getData().add(avgSeries);
     }
 
     @FXML
@@ -350,7 +396,8 @@ public class MetricsController {
             User patient = comboPatients.getValue();
             if (patient != null) {
                 notificationService.notifyPatient(patient, "Valores clínicos críticos detectados en tu última medición. Consulta a tu médico.");
-                if (loggedInDoctor != null) {
+                if (loggedInDoctor != null
+                        && ("doctor".equals(loggedInDoctor.getRole()) || "admin".equals(loggedInDoctor.getRole()))) {
                     notificationService.notifyDoctor(loggedInDoctor, "ALERTA: El paciente " + patient.getFirstName() + " " + patient.getLastName() + " tiene valores críticos registrados.");
                 }
             }

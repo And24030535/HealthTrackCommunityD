@@ -20,6 +20,7 @@ public class PatientsController {
 
     // Componentes del formulario
     @FXML private TextField txtFirstName, txtLastName, txtEmail, txtBirthDate, txtHeight;
+    @FXML private PasswordField txtPassword;
     @FXML private ComboBox<String> comboGender;
 
     // Componentes de la tabla
@@ -100,6 +101,9 @@ public class PatientsController {
                 // Valores fijos obligatorios para pacientes
                 newPatient.setRole("patient");
                 newPatient.setAssignedDoctorId(loggedInDoctor.getUid());
+                if (!txtPassword.getText().isEmpty()) {
+                    newPatient.setPassword(txtPassword.getText());
+                }
 
                 // Guardamos en un hilo nuevo
                 new Thread(() -> {
@@ -164,6 +168,7 @@ public class PatientsController {
         txtBirthDate.clear();
         comboGender.setValue(null);
         txtHeight.clear();
+        txtPassword.clear();
 
         selectedPatient = null;
         tablePatients.getSelectionModel().clearSelection();
@@ -176,5 +181,6 @@ public class PatientsController {
         txtBirthDate.setText(p.getBirthDate() != null ? p.getBirthDate() : "");
         comboGender.setValue(p.getGender());
         txtHeight.setText(p.getHeight() != null ? String.valueOf(p.getHeight()) : "");
+        txtPassword.clear(); // Never pre-fill passwords
     }
 }

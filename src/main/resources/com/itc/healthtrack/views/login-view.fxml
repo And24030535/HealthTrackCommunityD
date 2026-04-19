@@ -64,5 +64,10 @@
             </font>
         </Label>
 
+        <HBox alignment="CENTER" spacing="8.0">
+            <Label text="¿No tienes cuenta?" textFill="#aaaaaa" />
+            <Button mnemonicParsing="false" onAction="#onGoToRegister" styleClass="btn-default" text="Crear Cuenta" />
+        </HBox>
+
     </VBox>
 </StackPane>
