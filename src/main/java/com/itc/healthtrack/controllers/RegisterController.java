@@ -84,7 +84,11 @@ public class RegisterController {
                 if (!heightText.isEmpty()) {
                     try {
                         newUser.setHeight(Double.parseDouble(heightText));
-                    } catch (NumberFormatException ignored) {}
+                    } catch (NumberFormatException e) {
+                        Platform.runLater(() -> showStatus("Altura inválida. Verifica que sea un número decimal (ej: 1.75).", false));
+                        btnRegister.setDisable(false);
+                        return;
+                    }
                 }
 
                 userDAO.saveUser(newUser);
@@ -93,7 +97,9 @@ public class RegisterController {
                     showStatus("¡Cuenta creada exitosamente! Redirigiendo al login...", true);
                     btnRegister.setDisable(false);
                     new Thread(() -> {
-                        try { Thread.sleep(1500); } catch (InterruptedException ignored) {}
+                        try { Thread.sleep(1500); } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
                         Platform.runLater(() -> goToLogin(event));
                     }).start();
                 });

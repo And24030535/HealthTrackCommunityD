@@ -19,7 +19,8 @@ import java.util.List;
 public class PatientsController {
 
     // Componentes del formulario
-    @FXML private TextField txtFirstName, txtLastName, txtEmail, txtBirthDate, txtHeight, txtPassword;
+    @FXML private TextField txtFirstName, txtLastName, txtEmail, txtBirthDate, txtHeight;
+    @FXML private PasswordField txtPassword;
     @FXML private ComboBox<String> comboGender;
 
     // Componentes de la tabla
