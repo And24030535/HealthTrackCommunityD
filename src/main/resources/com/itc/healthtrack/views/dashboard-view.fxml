@@ -31,6 +31,7 @@
             <padding>
                 <Insets bottom="20.0" left="10.0" right="10.0" top="20.0" />
             </padding>
+            <Button fx:id="btnAdminPanel" maxWidth="Infinity" mnemonicParsing="false" onAction="#onShowAdmin" styleClass="btn, btn-warning" text="Panel de Admin" />
             <Button fx:id="btnPatientsList" maxWidth="Infinity" mnemonicParsing="false" onAction="#onShowPatientsList" styleClass="btn, btn-default" text="Lista de Pacientes" />
             <Button maxWidth="Infinity" mnemonicParsing="false" onAction="#onShowMetrics" styleClass="btn, btn-default" text="Métricas y Gráficos" />
             <Button maxWidth="Infinity" mnemonicParsing="false" onAction="#onShowReports" styleClass="btn, btn-default" text="Reportes Clínicos" />

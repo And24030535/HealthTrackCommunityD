@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<VBox spacing="20.0" style="-fx-background-color: #121212;" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.itc.healthtrack.controllers.AdminController">
+    <padding>
+        <Insets bottom="30.0" left="30.0" right="30.0" top="30.0"/>
+    </padding>
+
+    <!-- Title -->
+    <Label text="Panel de Administración" textFill="WHITE">
+        <font><Font name="System Bold" size="24.0"/></font>
+    </Label>
+    <Label text="Gestión global de usuarios registrados en el sistema HealthTrack." textFill="#aaaaaa" />
+
+    <!-- Statistics cards -->
+    <HBox spacing="20.0">
+        <VBox alignment="CENTER" prefWidth="180.0" prefHeight="90.0" styleClass="panel-secundario" style="-fx-padding: 15;">
+            <Label text="Total Usuarios" textFill="#aaaaaa" />
+            <Label fx:id="lblTotalUsers" text="—" textFill="WHITE">
+                <font><Font name="System Bold" size="30.0"/></font>
+            </Label>
+        </VBox>
+        <VBox alignment="CENTER" prefWidth="180.0" prefHeight="90.0" styleClass="panel-secundario" style="-fx-padding: 15;">
+            <Label text="Médicos" textFill="#aaaaaa" />
+            <Label fx:id="lblTotalDoctors" text="—" textFill="#2196f3">
+                <font><Font name="System Bold" size="30.0"/></font>
+            </Label>
+        </VBox>
+        <VBox alignment="CENTER" prefWidth="180.0" prefHeight="90.0" styleClass="panel-secundario" style="-fx-padding: 15;">
+            <Label text="Pacientes" textFill="#aaaaaa" />
+            <Label fx:id="lblTotalPatients" text="—" textFill="#4caf50">
+                <font><Font name="System Bold" size="30.0"/></font>
+            </Label>
+        </VBox>
+    </HBox>
+
+    <!-- User management table -->
+    <VBox spacing="10.0" VBox.vgrow="ALWAYS" styleClass="panel-secundario" style="-fx-padding: 20;">
+        <HBox alignment="CENTER_LEFT" spacing="15.0">
+            <Label text="Usuarios Registrados" textFill="WHITE">
+                <font><Font name="System Bold" size="16.0"/></font>
+            </Label>
+            <Region HBox.hgrow="ALWAYS" />
+            <Button text="Actualizar" onAction="#onRefresh" styleClass="btn, btn-default" />
+            <Button text="Eliminar Seleccionado" onAction="#onDeleteUser" styleClass="btn, btn-danger" />
+        </HBox>
+
+        <TableView fx:id="tableUsers" VBox.vgrow="ALWAYS">
+            <columns>
+                <TableColumn fx:id="colFirstName"  text="Nombre"   prefWidth="160" />
+                <TableColumn fx:id="colLastName"   text="Apellido" prefWidth="160" />
+                <TableColumn fx:id="colEmail"      text="Correo"   prefWidth="240" />
+                <TableColumn fx:id="colRole"       text="Rol"      prefWidth="100" />
+            </columns>
+            <columnResizePolicy>
+                <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+            </columnResizePolicy>
+        </TableView>
+
+        <Label fx:id="lblStatus" wrapText="true" textFill="#aaaaaa" />
+    </VBox>
+</VBox>

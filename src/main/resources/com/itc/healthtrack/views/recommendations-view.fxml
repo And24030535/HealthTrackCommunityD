@@ -12,27 +12,66 @@
     </Label>
 
     <HBox spacing="20.0" VBox.vgrow="ALWAYS">
+
+        <!-- Left panel: patient selection + recommendation history -->
         <VBox spacing="15.0" prefWidth="350.0" styleClass="panel-secundario" style="-fx-padding: 20;">
             <Label text="Selección de Paciente" textFill="WHITE">
                 <font><Font name="System Bold" size="16.0"/></font>
             </Label>
 
-            <ComboBox fx:id="comboPatients" maxWidth="Infinity" minHeight="-Infinity" prefHeight="35.0" promptText="Selecciona para analizar..." />
-            <Button text="Generar Análisis Clínico" onAction="#onAnalyzePatient" styleClass="btn-primary" maxWidth="Infinity" minHeight="-Infinity" prefHeight="40.0"/>
+            <ComboBox fx:id="comboPatients" maxWidth="Infinity" minHeight="-Infinity"
+                      prefHeight="35.0" promptText="Selecciona para analizar..." />
+            <Button text="Generar Análisis Clínico" onAction="#onAnalyzePatient"
+                    styleClass="btn-primary" maxWidth="Infinity" minHeight="-Infinity" prefHeight="40.0"/>
 
             <Separator style="-fx-background-color: #444444;" />
 
-            <Label text="Integración Web Service (FDA API)" textFill="WHITE">
+            <Label text="Historial de Análisis Guardados" textFill="WHITE">
                 <font><Font name="System Bold" size="14.0"/></font>
             </Label>
-            <TextArea fx:id="txtWebService" editable="false" wrapText="true" VBox.vgrow="ALWAYS" style="-fx-font-family: monospace; -fx-control-inner-background: #2c2c2c; -fx-text-fill: #e0e0e0;"/>
+            <Label text="Selecciona una entrada para ver el análisis completo." textFill="#aaaaaa"
+                   wrapText="true" style="-fx-font-size: 11px;" />
+
+            <ListView fx:id="listHistory" VBox.vgrow="ALWAYS"
+                      style="-fx-control-inner-background: #2c2c2c;
+                             -fx-background-color: #2c2c2c;
+                             -fx-border-color: #444444;
+                             -fx-border-radius: 3;" />
         </VBox>
 
+        <!-- Right panel: current diagnosis + tabbed external services -->
         <VBox spacing="15.0" HBox.hgrow="ALWAYS" styleClass="panel-secundario" style="-fx-padding: 20;">
+
             <Label text="Diagnóstico y Alertas" textFill="WHITE">
                 <font><Font name="System Bold" size="18.0"/></font>
             </Label>
-            <TextArea fx:id="txtRecommendations" editable="false" wrapText="true" VBox.vgrow="ALWAYS" style="-fx-font-size: 14px; -fx-text-fill: #e0e0e0; -fx-control-inner-background: #2c2c2c;" />
+            <TextArea fx:id="txtRecommendations" editable="false" wrapText="true" VBox.vgrow="ALWAYS"
+                      style="-fx-font-size: 14px; -fx-text-fill: #e0e0e0;
+                             -fx-control-inner-background: #2c2c2c;" />
+
+            <Separator style="-fx-background-color: #444444;" />
+
+            <Label text="Servicios Web Externos" textFill="WHITE">
+                <font><Font name="System Bold" size="14.0"/></font>
+            </Label>
+
+            <!-- TabPane with FDA and Nutritional API tabs -->
+            <TabPane VBox.vgrow="ALWAYS" tabClosingPolicy="UNAVAILABLE"
+                     style="-fx-background-color: transparent;">
+                <Tab text="FDA (Medicamentos)">
+                    <TextArea fx:id="txtWebService" editable="false" wrapText="true"
+                              style="-fx-font-family: monospace;
+                                     -fx-control-inner-background: #2c2c2c;
+                                     -fx-text-fill: #e0e0e0;" />
+                </Tab>
+                <Tab text="USDA (Nutrición)">
+                    <TextArea fx:id="txtNutrition" editable="false" wrapText="true"
+                              style="-fx-font-family: monospace;
+                                     -fx-control-inner-background: #2c2c2c;
+                                     -fx-text-fill: #e0e0e0;" />
+                </Tab>
+            </TabPane>
+
         </VBox>
     </HBox>
 </VBox>
