@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane prefHeight="700.0" prefWidth="1000.0" style="-fx-background-color: #121212;" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.itc.healthtrack.controllers.DashboardController">
+
+    <top>
+        <HBox alignment="CENTER_LEFT" prefHeight="60.0" styleClass="panel-secundario" style="-fx-border-width: 0 0 1 0;" BorderPane.alignment="CENTER">
+            <padding>
+                <Insets left="20.0" right="20.0" />
+            </padding>
+            <Label text="HealthTrack Community" textFill="WHITE">
+                <font>
+                    <Font name="System Bold" size="18.0" />
+                </font>
+            </Label>
+            <Label maxWidth="Infinity" HBox.hgrow="ALWAYS" />
+            <Label fx:id="userNameLabel" text="Nombre de Usuario" textFill="WHITE" />
+        </HBox>
+    </top>
+
+    <left>
+        <VBox prefWidth="200.0" spacing="10.0" styleClass="panel-secundario" style="-fx-border-width: 0 1 0 0;" BorderPane.alignment="CENTER">
+            <padding>
+                <Insets bottom="20.0" left="10.0" right="10.0" top="20.0" />
+            </padding>
+            <Button maxWidth="Infinity" mnemonicParsing="false" onAction="#onShowPatientsList" styleClass="btn, btn-default" text="Lista de Pacientes" />
+            <Button maxWidth="Infinity" mnemonicParsing="false" onAction="#onShowMetrics" styleClass="btn, btn-default" text="Métricas y Gráficos" />
+            <Button maxWidth="Infinity" mnemonicParsing="false" onAction="#onShowReports" styleClass="btn, btn-default" text="Reportes Clínicos" />
+            <Button maxWidth="Infinity" mnemonicParsing="false" onAction="#onShowRecommendations" styleClass="btn, btn-default" text="Inteligencia Clínica" />
+
+            <VBox alignment="BOTTOM_CENTER" VBox.vgrow="ALWAYS">
+                <Button maxWidth="Infinity" mnemonicParsing="false" onAction="#onLogout" styleClass="btn, btn-danger" text="Cerrar Sesión" />
+            </VBox>
+        </VBox>
+    </left>
+
+    <center>
+        <VBox fx:id="contentArea" alignment="CENTER" BorderPane.alignment="CENTER">
+            <Label text="Bienvenido al panel principal. Selecciona una opción del menú lateral." textFill="#7f8c8d" />
+        </VBox>
+    </center>
+</BorderPane>

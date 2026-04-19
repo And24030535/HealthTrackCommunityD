@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.chart.CategoryAxis?>
+<?import javafx.scene.chart.LineChart?>
+<?import javafx.scene.chart.NumberAxis?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<HBox spacing="20.0" style="-fx-background-color: #121212;" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.itc.healthtrack.controllers.MetricsController">
+    <padding>
+        <Insets bottom="20.0" left="20.0" right="20.0" top="20.0"/>
+    </padding>
+
+    <VBox spacing="15.0" prefWidth="350.0" styleClass="panel-secundario" style="-fx-padding: 20;">
+        <Label text="Registrar Métricas Médicas">
+            <font>
+                <Font name="System Bold" size="18.0"/>
+            </font>
+        </Label>
+
+        <VBox spacing="8.0">
+            <Label text="Seleccionar Paciente:" />
+            <ComboBox fx:id="comboPatients" maxWidth="Infinity" promptText="Elige un paciente..." />
+        </VBox>
+
+        <Separator style="-fx-background-color: #333333;" />
+
+        <GridPane hgap="10" vgap="12">
+            <Label text="Sistólica (mmHg):" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+            <TextField fx:id="txtSystolic" GridPane.columnIndex="1" GridPane.rowIndex="0" styleClass="form-control"/>
+
+            <Label text="Diastólica (mmHg):" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+            <TextField fx:id="txtDiastolic" GridPane.columnIndex="1" GridPane.rowIndex="1" styleClass="form-control"/>
+
+            <Label text="Pulso (lpm):" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+            <TextField fx:id="txtPulse" GridPane.columnIndex="1" GridPane.rowIndex="2" styleClass="form-control"/>
+
+            <Label text="Glucosa (mg/dL):" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
+            <TextField fx:id="txtGlucose" GridPane.columnIndex="1" GridPane.rowIndex="3" styleClass="form-control"/>
+
+            <Label text="Peso (kg):" GridPane.columnIndex="0" GridPane.rowIndex="4"/>
+            <TextField fx:id="txtWeight" GridPane.columnIndex="1" GridPane.rowIndex="4" styleClass="form-control"/>
+        </GridPane>
+
+        <VBox spacing="10.0" alignment="CENTER">
+            <HBox spacing="10.0">
+                <Button fx:id="btnSave" text="Guardar" onAction="#onSaveMetric" styleClass="btn-primary" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
+                <Button text="Eliminar" onAction="#onDeleteMetric" styleClass="btn-danger" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
+                <Button text="Limpiar" onAction="#onClearForm" styleClass="btn-default" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
+            </HBox>
+            <Label fx:id="lblStatus" wrapText="true" />
+        </VBox>
+    </VBox>
+
+    <VBox spacing="15.0" HBox.hgrow="ALWAYS">
+        <HBox alignment="CENTER_LEFT" spacing="20.0">
+            <Label text="Historial y Tendencias">
+                <font><Font name="System Bold" size="18.0"/></font>
+            </Label>
+            <Region HBox.hgrow="ALWAYS" />
+            <Label text="Filtrar por:" textFill="#cccccc"/>
+            <ComboBox fx:id="comboTimeFilter" prefWidth="150.0" styleClass="form-control"/>
+        </HBox>
+
+        <HBox spacing="15.0" styleClass="panel-secundario" style="-fx-padding: 10;">
+            <Label text="Promedios del periodo:" textFill="#cccccc">
+                <font><Font name="System Bold" size="12.0"/></font>
+            </Label>
+            <Label fx:id="lblAvgBP" text="PA: --/-- mmHg" textFill="#4caf50" />
+            <Label fx:id="lblAvgGlucose" text="Glucosa: -- mg/dL" textFill="#2196f3" />
+            <Label fx:id="lblAvgWeight" text="Peso: -- kg" textFill="#ff9800" />
+        </HBox>
+
+        <TableView fx:id="tableMetrics" prefHeight="200.0" VBox.vgrow="ALWAYS">
+            <columns>
+                <TableColumn fx:id="colDate" text="Fecha y Hora" prefWidth="160"/>
+                <TableColumn fx:id="colSysDia" text="PA (Sis/Dia)" prefWidth="100"/>
+                <TableColumn fx:id="colPulse" text="Pulso" prefWidth="70"/>
+                <TableColumn fx:id="colGlucose" text="Glucosa" prefWidth="80"/>
+                <TableColumn fx:id="colWeight" text="Peso" prefWidth="80"/>
+            </columns>
+            <columnResizePolicy>
+                <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+            </columnResizePolicy>
+        </TableView>
+
+        <LineChart fx:id="evolutionChart" title="Evolución de la Presión Arterial" prefHeight="250.0" VBox.vgrow="ALWAYS">
+            <xAxis>
+                <CategoryAxis label="Línea de tiempo" side="BOTTOM" animated="false" />
+            </xAxis>
+            <yAxis>
+                <NumberAxis label="mmHg" side="LEFT" animated="false" />
+            </yAxis>
+        </LineChart>
+    </VBox>
+</HBox>

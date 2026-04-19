@@ -1,0 +1,55 @@
+package com.itc.healthtrack.models;
+
+import com.google.cloud.Timestamp;
+
+/**
+ * Representa una medicion individual en el sistema (presion, glucosa, peso).
+ */
+public class Metric {
+    private String id;
+    private String patientId;
+    private Timestamp timestamp;
+    private String metricType; // "blood_pressure", "weight", "glucose"
+    private String notes;
+    private Integer systolic;
+    private Integer diastolic;
+    private Integer pulse;
+    private Double weight;
+    private Double bmi;
+    private Double glucoseLevel;
+
+    public Metric() {}
+
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+
+    public String getPatientId() { return patientId; }
+    public void setPatientId(String patientId) { this.patientId = patientId; }
+
+    public Timestamp getTimestamp() { return timestamp; }
+    public void setTimestamp(Timestamp timestamp) { this.timestamp = timestamp; }
+
+    public String getMetricType() { return metricType; }
+    public void setMetricType(String metricType) { this.metricType = metricType; }
+
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
+
+    public Integer getSystolic() { return systolic; }
+    public void setSystolic(Integer systolic) { this.systolic = systolic; }
+
+    public Integer getDiastolic() { return diastolic; }
+    public void setDiastolic(Integer diastolic) { this.diastolic = diastolic; }
+
+    public Integer getPulse() { return pulse; }
+    public void setPulse(Integer pulse) { this.pulse = pulse; }
+
+    public Double getWeight() { return weight; }
+    public void setWeight(Double weight) { this.weight = weight; }
+
+    public Double getBmi() { return bmi; }
+    public void setBmi(Double bmi) { this.bmi = bmi; }
+
+    public Double getGlucoseLevel() { return glucoseLevel; }
+    public void setGlucoseLevel(Double glucoseLevel) { this.glucoseLevel = glucoseLevel; }
+}

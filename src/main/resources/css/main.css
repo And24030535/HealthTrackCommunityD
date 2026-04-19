@@ -1,0 +1,202 @@
+/* main.css */
+
+.root {
+    -fx-background-color: #121212;
+    -fx-font-family: "Segoe UI", Arial, sans-serif;
+    -fx-font-size: 14px;
+}
+
+/* Etiquetas y Textos Globales */
+.label, .text {
+    -fx-text-fill: #e0e0e0;
+    -fx-fill: #e0e0e0;
+}
+
+/* Paneles contenedores */
+.panel-secundario {
+    -fx-background-color: #1e1e1e;
+    -fx-border-color: #333333;
+    -fx-border-radius: 5;
+    -fx-background-radius: 5;
+}
+
+/* Campos de entrada, ComboBox y DatePicker */
+.text-field, .text-area, .password-field, .form-control, .combo-box {
+    -fx-background-color: #2c2c2c;
+    -fx-text-fill: #ffffff;
+    -fx-prompt-text-fill: #888888;
+    -fx-border-color: #444444;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+}
+
+.text-field:focused, .text-area:focused, .password-field:focused, .form-control:focused {
+    -fx-border-color: #3f51b5;
+}
+
+/* Estilos internos del ComboBox */
+.combo-box .list-cell {
+    -fx-text-fill: #ffffff;
+}
+
+.combo-box-popup .list-view {
+    -fx-background-color: #2c2c2c;
+    -fx-border-color: #444444;
+}
+
+.combo-box-popup .list-view .list-cell:hover {
+    -fx-background-color: #3f51b5;
+    -fx-text-fill: #ffffff;
+}
+
+/* Tablas de datos (Correccion de visibilidad) */
+.table-view {
+    -fx-background-color: #121212;
+    -fx-control-inner-background: #1e1e1e;
+    -fx-table-cell-border-color: #333333;
+    -fx-border-color: #333333;
+}
+
+.table-view .column-header-background {
+    -fx-background-color: #2c2c2c;
+}
+
+.table-view .column-header, .table-view .filler {
+    -fx-background-color: #2c2c2c;
+    -fx-size: 35;
+    -fx-border-color: #444444;
+}
+
+.table-view .column-header .label {
+    -fx-text-fill: #ffffff;
+    -fx-font-weight: bold;
+}
+
+.table-row-cell {
+    -fx-background-color: #1e1e1e;
+}
+
+.table-row-cell:odd {
+    -fx-background-color: #252525;
+}
+
+.table-row-cell:selected {
+    -fx-background-color: #3f51b5;
+}
+
+/* Forzar que el texto de las celdas siempre sea visible */
+.table-cell {
+    -fx-text-fill: #e0e0e0;
+}
+
+/* Botones */
+.button, .btn, .btn-default {
+    -fx-background-color: #333333;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #555555;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+    -fx-cursor: hand;
+}
+
+/* Cuando el ratón pasa por encima */
+.button:hover, .btn:hover, .btn-default:hover {
+    -fx-background-color: #555555;
+    -fx-text-fill: #ffffff;
+}
+
+/* Cuando el botón está seleccionado (con el foco) */
+.button:focused, .btn:focused, .btn-default:focused {
+    -fx-background-color: #444444;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #3f51b5; /* Borde azul para indicar selección */
+}
+
+/* Cuando el botón está siendo presionado */
+.button:pressed, .btn:pressed, .btn-default:pressed {
+    -fx-background-color: #252525;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #555555;
+}
+
+/* Botones de acción específicos */
+.btn-primary { -fx-background-color: #2196f3; -fx-border-color: transparent; }
+.btn-primary:hover { -fx-background-color: #1976d2; }
+
+.btn-success { -fx-background-color: #4caf50; -fx-border-color: transparent; }
+.btn-success:hover { -fx-background-color: #388e3c; }
+
+.btn-danger { -fx-background-color: #f44336; -fx-border-color: transparent; }
+.btn-danger:hover { -fx-background-color: #d32f2f; }
+
+.btn-warning { -fx-background-color: #ff9800; -fx-border-color: transparent; }
+.btn-warning:hover { -fx-background-color: #f57c00; }
+
+/* =========================================
+   ComboBox y Listas Desplegables
+   ========================================= */
+.combo-box, .combo-box-base {
+    -fx-background-color: #2c2c2c;
+    -fx-border-color: #444444;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+}
+
+/* El texto que se muestra cuando el combo está cerrado */
+.combo-box .list-cell {
+    -fx-text-fill: #ffffff;
+    -fx-background-color: transparent;
+}
+
+/* El fondo de la caja flotante que se abre */
+.combo-box-popup .list-view {
+    -fx-background-color: #2c2c2c;
+    -fx-border-color: #444444;
+    -fx-border-width: 1px;
+}
+
+/* Las opciones individuales dentro de la caja flotante (CORRECCIÓN AQUÍ) */
+.combo-box-popup .list-view .list-cell {
+    -fx-background-color: #2c2c2c; /* Fuerza el fondo oscuro */
+    -fx-text-fill: #e0e0e0;        /* Fuerza el texto claro */
+    -fx-padding: 5 10 5 10;
+}
+
+/* Cuando pasas el ratón sobre una opción */
+.combo-box-popup .list-view .list-cell:filled:hover {
+    -fx-background-color: #3f51b5;
+    -fx-text-fill: #ffffff;
+}
+
+/* Cuando la opción ya está seleccionada y vuelves a abrir el menú */
+.combo-box-popup .list-view .list-cell:filled:selected {
+    -fx-background-color: #444444;
+    -fx-text-fill: #ffffff;
+}
+
+/* =========================================
+   Gráficos Estadísticos
+   ========================================= */
+.chart-title {
+    -fx-text-fill: #ffffff;
+}
+
+.axis-label, .chart-legend .label {
+    -fx-text-fill: #e0e0e0;
+}
+
+.axis {
+    -fx-tick-label-fill: #e0e0e0;
+}
+
+.chart-plot-background {
+    -fx-background-color: #1e1e1e;
+}
+
+.chart-vertical-grid-lines, .chart-horizontal-grid-lines {
+    -fx-stroke: #333333;
+}
+
+.chart-legend {
+    -fx-background-color: transparent;
+}

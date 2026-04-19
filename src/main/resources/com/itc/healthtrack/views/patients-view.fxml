@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<HBox spacing="20.0" style="-fx-background-color: #121212;" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.itc.healthtrack.controllers.PatientsController">
+    <padding>
+        <Insets bottom="20.0" left="20.0" right="20.0" top="20.0"/>
+    </padding>
+
+    <VBox spacing="15.0" prefWidth="350.0" styleClass="panel-secundario" style="-fx-padding: 20;">
+        <Label text="Información del Paciente">
+            <font>
+                <Font name="System Bold" size="18.0"/>
+            </font>
+        </Label>
+
+        <GridPane hgap="10" vgap="15">
+            <Label text="Nombre:" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+            <TextField fx:id="txtFirstName" GridPane.columnIndex="1" GridPane.rowIndex="0" styleClass="form-control"/>
+
+            <Label text="Apellido:" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
+            <TextField fx:id="txtLastName" GridPane.columnIndex="1" GridPane.rowIndex="1" styleClass="form-control"/>
+
+            <Label text="Correo:" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+            <TextField fx:id="txtEmail" GridPane.columnIndex="1" GridPane.rowIndex="2" styleClass="form-control"/>
+
+            <Label text="Fecha de Nac.:" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
+            <TextField fx:id="txtBirthDate" promptText="AAAA-MM-DD" GridPane.columnIndex="1" GridPane.rowIndex="3" styleClass="form-control"/>
+
+            <Label text="Género:" GridPane.columnIndex="0" GridPane.rowIndex="4"/>
+            <ComboBox fx:id="comboGender" promptText="Seleccionar" GridPane.columnIndex="1" GridPane.rowIndex="4" styleClass="form-control"/>
+
+            <Label text="Altura (m):" GridPane.columnIndex="0" GridPane.rowIndex="5"/>
+            <TextField fx:id="txtHeight" GridPane.columnIndex="1" GridPane.rowIndex="5" styleClass="form-control"/>
+        </GridPane>
+
+        <HBox spacing="10.0" alignment="CENTER">
+            <Button text="Guardar" onAction="#onSavePatient" styleClass="btn, btn-primary" prefWidth="100.0"/>
+            <Button text="Eliminar" onAction="#onDeletePatient" styleClass="btn, btn-danger" prefWidth="100.0"/>
+            <Button text="Limpiar" onAction="#onClearForm" styleClass="btn, btn-default" prefWidth="100.0"/>
+        </HBox>
+    </VBox>
+
+    <VBox spacing="10.0" HBox.hgrow="ALWAYS">
+        <Label text="Pacientes Registrados">
+            <font>
+                <Font name="System Bold" size="18.0"/>
+            </font>
+        </Label>
+
+        <TableView fx:id="tablePatients" VBox.vgrow="ALWAYS">
+            <columns>
+                <TableColumn fx:id="colFirstName" text="Nombre" prefWidth="120"/>
+                <TableColumn fx:id="colLastName" text="Apellido" prefWidth="120"/>
+                <TableColumn fx:id="colEmail" text="Correo Electrónico" prefWidth="150"/>
+                <TableColumn fx:id="colGender" text="Género" prefWidth="80"/>
+            </columns>
+            <columnResizePolicy>
+                <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+            </columnResizePolicy>
+        </TableView>
+    </VBox>
+</HBox>
