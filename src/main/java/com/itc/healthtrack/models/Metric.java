@@ -13,7 +13,7 @@ public class Metric {
     private String notes;
     private Integer systolic;
     private Integer diastolic;
-    private Integer pulse;
+    private Integer heartRate;
     private Double weight;
     private Double bmi;
     private Double glucoseLevel;
@@ -41,8 +41,8 @@ public class Metric {
     public Integer getDiastolic() { return diastolic; }
     public void setDiastolic(Integer diastolic) { this.diastolic = diastolic; }
 
-    public Integer getPulse() { return pulse; }
-    public void setPulse(Integer pulse) { this.pulse = pulse; }
+    public Integer getHeartRate() { return heartRate; }
+    public void setHeartRate(Integer heartRate) { this.heartRate = heartRate; }
 
     public Double getWeight() { return weight; }
     public void setWeight(Double weight) { this.weight = weight; }

@@ -72,6 +72,10 @@ public class DashboardController {
                     ReportsController rc = loader.getController();
                     rc.initData(loggedInUser);
                     break;
+                case "recommendations":
+                    RecommendationsController rcc = loader.getController();
+                    rcc.initData(loggedInUser);
+                    break;
             }
 
             contentArea.getChildren().clear();
@@ -106,6 +110,6 @@ public class DashboardController {
 
     @FXML
     protected void onShowRecommendations() {
-        changeModule("/com/itc/healthtrack/views/recommendations-view.fxml", "recommendations"); // Asume que agregas el caso "recommendations" en el switch de changeModule
+        changeModule("/com/itc/healthtrack/views/recommendations-view.fxml", "recommendations");
     }
 }

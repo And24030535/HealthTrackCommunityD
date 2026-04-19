@@ -34,8 +34,8 @@
             <Label text="Diastólica (mmHg):" GridPane.columnIndex="0" GridPane.rowIndex="1"/>
             <TextField fx:id="txtDiastolic" GridPane.columnIndex="1" GridPane.rowIndex="1" styleClass="form-control"/>
 
-            <Label text="Pulso (lpm):" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
-            <TextField fx:id="txtPulse" GridPane.columnIndex="1" GridPane.rowIndex="2" styleClass="form-control"/>
+            <Label text="F. Cardíaca (lpm):" GridPane.columnIndex="0" GridPane.rowIndex="2"/>
+            <TextField fx:id="txtHeartRate" GridPane.columnIndex="1" GridPane.rowIndex="2" styleClass="form-control"/>
 
             <Label text="Glucosa (mg/dL):" GridPane.columnIndex="0" GridPane.rowIndex="3"/>
             <TextField fx:id="txtGlucose" GridPane.columnIndex="1" GridPane.rowIndex="3" styleClass="form-control"/>
@@ -77,7 +77,7 @@
             <columns>
                 <TableColumn fx:id="colDate" text="Fecha y Hora" prefWidth="160"/>
                 <TableColumn fx:id="colSysDia" text="PA (Sis/Dia)" prefWidth="100"/>
-                <TableColumn fx:id="colPulse" text="Pulso" prefWidth="70"/>
+                <TableColumn fx:id="colHeartRate" text="F. Cardíaca" prefWidth="70"/>
                 <TableColumn fx:id="colGlucose" text="Glucosa" prefWidth="80"/>
                 <TableColumn fx:id="colWeight" text="Peso" prefWidth="80"/>
             </columns>

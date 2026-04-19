@@ -136,7 +136,7 @@ public class ReportsController {
         for (Metric m : history) {
             String date = m.getTimestamp() != null ? m.getTimestamp().toDate().toString() : "N/A";
             String bp = (m.getSystolic() != null && m.getDiastolic() != null) ? m.getSystolic() + "/" + m.getDiastolic() : "-";
-            String pulse = m.getPulse() != null ? String.valueOf(m.getPulse()) : "-";
+            String pulse = m.getHeartRate() != null ? String.valueOf(m.getHeartRate()) : "-";
             String glucose = m.getGlucoseLevel() != null ? String.valueOf(m.getGlucoseLevel()) : "-";
             String weight = m.getWeight() != null ? String.valueOf(m.getWeight()) : "-";
 
@@ -232,7 +232,7 @@ public class ReportsController {
 
             String date = m.getTimestamp() != null ? m.getTimestamp().toDate().toString() : "N/A";
             String bp = (m.getSystolic() != null && m.getDiastolic() != null) ? m.getSystolic() + "/" + m.getDiastolic() : "-";
-            String pulse = m.getPulse() != null ? String.valueOf(m.getPulse()) : "-";
+            String pulse = m.getHeartRate() != null ? String.valueOf(m.getHeartRate()) : "-";
             String glucose = m.getGlucoseLevel() != null ? String.valueOf(m.getGlucoseLevel()) : "-";
             String weight = m.getWeight() != null ? String.valueOf(m.getWeight()) : "-";
 

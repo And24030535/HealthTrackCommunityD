@@ -5,6 +5,7 @@ import com.itc.healthtrack.dao.MetricDAO;
 import com.itc.healthtrack.dao.PatientDAO;
 import com.itc.healthtrack.models.Metric;
 import com.itc.healthtrack.models.User;
+import com.itc.healthtrack.services.NotificationService;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -22,7 +23,7 @@ public class MetricsController {
 
     // Componentes de la interfaz de usuario
     @FXML private ComboBox<User> comboPatients;
-    @FXML private TextField txtSystolic, txtDiastolic, txtPulse, txtGlucose, txtWeight;
+    @FXML private TextField txtSystolic, txtDiastolic, txtHeartRate, txtGlucose, txtWeight;
     @FXML private Button btnSave;
     @FXML private Label lblStatus;
 
@@ -31,12 +32,13 @@ public class MetricsController {
     @FXML private Label lblAvgBP, lblAvgGlucose, lblAvgWeight;
 
     @FXML private TableView<Metric> tableMetrics;
-    @FXML private TableColumn<Metric, String> colDate, colSysDia, colPulse, colGlucose, colWeight;
+    @FXML private TableColumn<Metric, String> colDate, colSysDia, colHeartRate, colGlucose, colWeight;
     @FXML private LineChart<String, Number> evolutionChart;
 
     // Acceso a la base de datos y variables de estado
     private final PatientDAO patientDAO = new PatientDAO();
     private final MetricDAO metricDAO = new MetricDAO();
+    private final NotificationService notificationService = new NotificationService();
     private final ObservableList<Metric> metricsObservableList = FXCollections.observableArrayList();
 
     private User loggedInDoctor;
@@ -79,7 +81,7 @@ public class MetricsController {
             return new SimpleStringProperty((sys != null && dia != null) ? sys + "/" + dia : "-");
         });
 
-        colPulse.setCellValueFactory(cellData -> new SimpleStringProperty(String.valueOf(cellData.getValue().getPulse())));
+        colHeartRate.setCellValueFactory(cellData -> new SimpleStringProperty(String.valueOf(cellData.getValue().getHeartRate())));
         colGlucose.setCellValueFactory(cellData -> new SimpleStringProperty(String.valueOf(cellData.getValue().getGlucoseLevel())));
         colWeight.setCellValueFactory(cellData -> new SimpleStringProperty(String.valueOf(cellData.getValue().getWeight())));
 
@@ -91,7 +93,7 @@ public class MetricsController {
                 selectedMetric = newSelection;
                 txtSystolic.setText(newSelection.getSystolic() != null ? String.valueOf(newSelection.getSystolic()) : "");
                 txtDiastolic.setText(newSelection.getDiastolic() != null ? String.valueOf(newSelection.getDiastolic()) : "");
-                txtPulse.setText(newSelection.getPulse() != null ? String.valueOf(newSelection.getPulse()) : "");
+                txtHeartRate.setText(newSelection.getHeartRate() != null ? String.valueOf(newSelection.getHeartRate()) : "");
                 txtGlucose.setText(newSelection.getGlucoseLevel() != null ? String.valueOf(newSelection.getGlucoseLevel()) : "");
                 txtWeight.setText(newSelection.getWeight() != null ? String.valueOf(newSelection.getWeight()) : "");
 
@@ -228,12 +230,25 @@ public class MetricsController {
 
             metricToProcess.setSystolic(txtSystolic.getText().isEmpty() ? null : Integer.parseInt(txtSystolic.getText()));
             metricToProcess.setDiastolic(txtDiastolic.getText().isEmpty() ? null : Integer.parseInt(txtDiastolic.getText()));
-            metricToProcess.setPulse(txtPulse.getText().isEmpty() ? null : Integer.parseInt(txtPulse.getText()));
+            metricToProcess.setHeartRate(txtHeartRate.getText().isEmpty() ? null : Integer.parseInt(txtHeartRate.getText()));
             metricToProcess.setGlucoseLevel(txtGlucose.getText().isEmpty() ? null : Double.parseDouble(txtGlucose.getText()));
             metricToProcess.setWeight(txtWeight.getText().isEmpty() ? null : Double.parseDouble(txtWeight.getText()));
 
+            // Auto-calculate BMI when weight and patient height are available
+            if (metricToProcess.getWeight() != null && selectedPatient.getHeight() != null && selectedPatient.getHeight() > 0) {
+                double heightM = selectedPatient.getHeight();
+                double bmi = metricToProcess.getWeight() / (heightM * heightM);
+                metricToProcess.setBmi(Math.round(bmi * 10.0) / 10.0);
+            }
+
             lblStatus.setText(isNewRecord ? "Guardando..." : "Actualizando...");
             lblStatus.setTextFill(Color.web("#ffffff"));
+
+            // Evaluate clinical thresholds and show visual alerts
+            String alert = evaluateClinicalThresholds(metricToProcess, selectedPatient);
+            if (alert != null) {
+                showClinicalAlert(alert);
+            }
 
             new Thread(() -> {
                 try {
@@ -250,6 +265,10 @@ public class MetricsController {
                         lblStatus.setTextFill(Color.web("#4caf50"));
                     });
                 } catch (Exception e) {
+                    Platform.runLater(() -> {
+                        lblStatus.setText("Error al guardar en la base de datos.");
+                        lblStatus.setTextFill(Color.web("#ff5252"));
+                    });
                     e.printStackTrace();
                 }
             }).start();
@@ -258,6 +277,81 @@ public class MetricsController {
             lblStatus.setText("Error: Usa valores numéricos válidos.");
             lblStatus.setTextFill(Color.web("#ff5252"));
         }
+    }
+
+    /**
+     * Evaluates clinical thresholds and returns an alert message if critical values are detected.
+     */
+    private String evaluateClinicalThresholds(Metric metric, User patient) {
+        StringBuilder alert = new StringBuilder();
+
+        if (metric.getSystolic() != null && metric.getDiastolic() != null) {
+            int sys = metric.getSystolic();
+            int dia = metric.getDiastolic();
+            if (sys >= 180 || dia >= 120) {
+                alert.append("⚠ ALERTA CRÍTICA: Hipertensión en crisis (").append(sys).append("/").append(dia).append(" mmHg).\nConsulta médica urgente.\n\n");
+            } else if (sys >= 140 || dia >= 90) {
+                alert.append("⚠ ALERTA: Hipertensión arterial detectada (").append(sys).append("/").append(dia).append(" mmHg).\n\n");
+            }
+        }
+
+        if (metric.getGlucoseLevel() != null) {
+            double gluc = metric.getGlucoseLevel();
+            if (gluc > 300) {
+                alert.append("⚠ ALERTA CRÍTICA: Glucosa muy elevada (").append(gluc).append(" mg/dL). Riesgo de cetoacidosis.\n\n");
+            } else if (gluc > 125) {
+                alert.append("⚠ ALERTA: Glucosa elevada (").append(gluc).append(" mg/dL). Posible diabetes.\n\n");
+            } else if (gluc < 70) {
+                alert.append("⚠ ALERTA: Hipoglucemia detectada (").append(gluc).append(" mg/dL).\n\n");
+            }
+        }
+
+        if (metric.getHeartRate() != null) {
+            int hr = metric.getHeartRate();
+            if (hr > 120) {
+                alert.append("⚠ ALERTA: Frecuencia cardíaca elevada (").append(hr).append(" lpm). Taquicardia.\n\n");
+            } else if (hr < 50) {
+                alert.append("⚠ ALERTA: Frecuencia cardíaca baja (").append(hr).append(" lpm). Bradicardia.\n\n");
+            }
+        }
+
+        if (metric.getBmi() != null) {
+            double bmi = metric.getBmi();
+            if (bmi >= 40) {
+                alert.append("⚠ ALERTA: Obesidad mórbida (IMC ").append(bmi).append("). Riesgo cardiovascular alto.\n\n");
+            } else if (bmi >= 30) {
+                alert.append("ℹ Obesidad detectada (IMC ").append(bmi).append("). Se recomienda plan nutricional.\n\n");
+            }
+        }
+
+        return alert.length() > 0 ? alert.toString().trim() : null;
+    }
+
+    /**
+     * Displays a clinical alert dialog in the JavaFX UI thread.
+     */
+    private void showClinicalAlert(String message) {
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Alerta Clínica — HealthTrack");
+            alert.setHeaderText("Se detectaron valores fuera del rango clínico normal");
+            alert.setContentText(message);
+            alert.getDialogPane().setStyle("-fx-background-color: #1e1e1e; -fx-font-size: 13px;");
+            alert.showAndWait();
+
+            // Update status label to indicate alert was triggered
+            lblStatus.setText("⚠ Valores críticos detectados. Revisa la alerta.");
+            lblStatus.setTextFill(Color.web("#ff9800"));
+
+            // Notify via the notification service
+            User patient = comboPatients.getValue();
+            if (patient != null) {
+                notificationService.notifyPatient(patient, "Valores clínicos críticos detectados en tu última medición. Consulta a tu médico.");
+                if (loggedInDoctor != null) {
+                    notificationService.notifyDoctor(loggedInDoctor, "ALERTA: El paciente " + patient.getFirstName() + " " + patient.getLastName() + " tiene valores críticos registrados.");
+                }
+            }
+        });
     }
 
     @FXML
@@ -292,7 +386,7 @@ public class MetricsController {
     protected void onClearForm() {
         txtSystolic.clear();
         txtDiastolic.clear();
-        txtPulse.clear();
+        txtHeartRate.clear();
         txtGlucose.clear();
         txtWeight.clear();
 
