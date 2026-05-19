@@ -113,6 +113,9 @@ public class RegisterController {
                     }
                 }
 
+                // Genera un ID nuevo para el usuario y lo asigna al modelo
+                String newId = userDao.createDocumentId();
+                newUser.setUid(newId);
                 // Selecciona un doctor si el nuevo usuario es paciente
                 if ("patient".equals(mappedRole)) {
                     // Busca todos los doctores disponibles
@@ -126,10 +129,6 @@ public class RegisterController {
                         System.out.println("Paciente registrado pero no hay doctores disponibles para asignar");
                     }
                 }
-
-                // Genera un ID nuevo para el usuario y lo asigna al modelo
-                String newId = userDao.createDocumentId();
-                newUser.setUid(newId);
                 // Guarda el usuario completo en Firestore con el ID generado
                 userDao.save(newId, newUser);
 
