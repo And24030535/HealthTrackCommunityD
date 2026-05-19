@@ -18,10 +18,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 
-/**
- * Controlador del Panel de Administración
- * Gestiona la visualización de estadísticas de usuarios, búsqueda, eliminación y cambio de roles.
- */
+//Controlador del Panel de Administración
+// Gestiona la visualización de estadísticas de usuarios, búsqueda, eliminación y cambio de roles
 public class AdminController {
 
     // Elementos de la interfaz
@@ -49,6 +47,27 @@ public class AdminController {
     private User loggedInAdmin;             // Usuario administrador logeado
     private User selectedUser = null;       // Usuario seleccionado en la tabla
 
+    // Metodo para traducir variable a vista del usuario
+    private String translateRole(String role) {
+        if (role == null) return "—";
+        switch (role) {
+            case "patient": return "Paciente";
+            case "doctor":  return "Doctor";
+            case "admin":   return "Admin";
+            default:        return role;
+        }
+    }
+
+    private String getRoleValue(String roleLabel) {
+        if (roleLabel == null) return "patient";
+        switch (roleLabel) {
+            case "Paciente": return "patient";
+            case "Doctor":   return "doctor";
+            case "Admin":    return "admin";
+            default:         return roleLabel;
+        }
+    }
+
     /*Inicializa el controlador con los datos del administrador logeado
      Configura la interfaz y carga la lista de usuarios  */
     public void initData(User admin) {
@@ -59,20 +78,31 @@ public class AdminController {
     }
 
     /*Configura el filtro de roles (Todos, Doctor, Paciente, Admin)
-     Esto permite filtrar usuarios por su rol de forma rápida*/
+    esto permite filtrar usuarios por su rol de forma rápida*/
     private void setupSearchControls() {
-        cbRoleFilter.setItems(FXCollections.observableArrayList("Todos", "patient", "doctor", "admin"));
+        cbRoleFilter.setItems(FXCollections.observableArrayList("Todos", "Paciente", "Doctor", "Admin"));
         cbRoleFilter.setValue("Todos");  // Por defecto muestra todos
     }
 
     /*Configura las columnas de la tabla para mostrar datos de los usuarios
-     También configura el escuchador para detectar cuando se selecciona un usuario*/
+    , también configura el escuchador para detectar cuando se selecciona un usuario*/
     private void setupTable() {
         // Vincula cada columna con su propiedad correspondiente del modelo User
         colFirstName.setCellValueFactory(new PropertyValueFactory<>("firstName"));
         colLastName.setCellValueFactory(new PropertyValueFactory<>("lastName"));
         colEmail.setCellValueFactory(new PropertyValueFactory<>("email"));
-        colRole.setCellValueFactory(new PropertyValueFactory<>("role"));
+        colRole.setCellValueFactory(new PropertyValueFactory<>("role"));      // obtiene el dato
+        colRole.setCellFactory(column -> new TableCell<User, String>() { //traduce
+            @Override
+            protected void updateItem(String role, boolean empty) {
+                super.updateItem(role, empty);
+                if (empty || role == null) {
+                    setText(null);
+                } else {
+                    setText(translateRole(role));  // Usa el método auxiliar
+                }
+            }
+        });
         colAssignedDoctor.setCellValueFactory(new PropertyValueFactory<>("assignedDoctorName"));
 
         // Crea una lista filtrable a partir de la lista de usuarios
@@ -159,10 +189,14 @@ public class AdminController {
         String keyword    = txtSearch.getText() == null ? "" : txtSearch.getText().trim().toLowerCase();
         String roleFilter = cbRoleFilter.getValue();
 
+        // Convierte el rol del ComboBox al valor de la BD
+        String roleValue = getRoleValue(roleFilter);
+        String finalRoleValue = roleValue;
+
         // Establece la condición de filtro
         filteredList.setPredicate(user -> {
             // Verifica que el rol coincida (o si está marcado "Todos")
-            boolean roleMatch = "Todos".equals(roleFilter) || roleFilter.equals(user.getRole());
+            boolean roleMatch = "Todos".equals(roleFilter) || finalRoleValue.equals(user.getRole());
 
             // Verifica que el texto sea encontrado en nombre, apellido o correo
             boolean textMatch = keyword.isEmpty()
@@ -218,7 +252,7 @@ public class AdminController {
         row = addDetailRow(grid, row, "Correo",   selectedUser.getEmail());
         row = addDetailRow(grid, row, "Nombre",   selectedUser.getFirstName());
         row = addDetailRow(grid, row, "Apellido", selectedUser.getLastName());
-        row = addDetailRow(grid, row, "Rol",      selectedUser.getRole());
+        row = addDetailRow(grid, row, "Rol",      translateRole(selectedUser.getRole())); // Traduce el rol
 
         if ("patient".equals(selectedUser.getRole())) {
             row = addDetailRow(grid, row, "Nacimiento", selectedUser.getBirthDate());
@@ -334,16 +368,17 @@ public class AdminController {
             return;
         }
 
-        // Crea un diálogo de opciones con los roles disponibles
-        ChoiceDialog<String> dialog = new ChoiceDialog<>(selectedUser.getRole(),
-                "patient", "doctor", "admin");
+        // Crea un diálogo de opciones con los roles disponibles en español
+        ChoiceDialog<String> dialog = new ChoiceDialog<>(translateRole(selectedUser.getRole()),
+                "Paciente", "Doctor", "Admin");
         dialog.setTitle("Cambiar Rol");
         dialog.setHeaderText("Usuario: " + selectedUser.getFirstName() + " " + selectedUser.getLastName());
         dialog.setContentText("Selecciona el nuevo rol:");
         dialog.getDialogPane().setStyle("-fx-background-color: #1e1e1e; -fx-font-size: 13px;");
 
         // Si el usuario elige un nuevo rol
-        dialog.showAndWait().ifPresent(newRole -> {
+        dialog.showAndWait().ifPresent(newRoleLabel -> {
+            String newRole = getRoleValue(newRoleLabel);  // Convierte a inglés
             // Si seleccionó el mismo rol, no hace nada
             if (newRole.equals(selectedUser.getRole())) return;
 
@@ -353,7 +388,7 @@ public class AdminController {
                     userDAO.updateUserRole(selectedUser.getUid(), newRole);
                     Platform.runLater(() -> {
                         loadAllUsers();  // Recarga la tabla
-                        lblStatus.setText("Rol actualizado a: " + newRole);
+                        lblStatus.setText("Rol actualizado a: " + newRoleLabel); // Muestra en español
                         lblStatus.setTextFill(Color.web("#4caf50"));
                     });
                 } catch (Exception e) {

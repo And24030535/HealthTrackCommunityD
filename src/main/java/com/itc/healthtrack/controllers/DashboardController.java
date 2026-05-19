@@ -97,7 +97,7 @@ public class DashboardController {
         changeModule("/com/itc/healthtrack/views/recommendations-view.fxml", "recommendations");
     }
 
-    /*Método genérico para cargar vistas FXML
+    /*Metodo generico para cargar vistas FXML
      Instancia el controlador correspondiente y pasa los datos del usuario.*/
     private void changeModule(String fxmlPath, String moduleType) {
         try {
