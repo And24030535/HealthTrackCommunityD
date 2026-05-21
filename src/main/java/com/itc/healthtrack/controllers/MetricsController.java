@@ -1,8 +1,7 @@
 package com.itc.healthtrack.controllers;
 
 import com.google.cloud.Timestamp;
-import com.itc.healthtrack.dao.MetricDAO;
-import com.itc.healthtrack.dao.PatientDAO;
+import com.itc.healthtrack.dao.GenericDAO;
 import com.itc.healthtrack.models.Metric;
 import com.itc.healthtrack.models.User;
 import com.itc.healthtrack.services.NotificationService;
@@ -18,6 +17,8 @@ import javafx.scene.control.*;
 import javafx.scene.paint.Color;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 public class MetricsController {
@@ -40,8 +41,8 @@ public class MetricsController {
     @FXML private BarChart<String, Number> averagesChart;         // Gráfico de barras: Promedios
 
     // Acceso a la base de datos y variables de estado
-    private final PatientDAO patientDAO = new PatientDAO();
-    private final MetricDAO metricDAO = new MetricDAO();
+    private final GenericDAO<User> userDao = new GenericDAO<>(User.class, "users");
+    private final GenericDAO<Metric> metricDao = new GenericDAO<>(Metric.class, "metrics");
     private final NotificationService notificationService = new NotificationService();
     private final ObservableList<Metric> metricsObservableList = FXCollections.observableArrayList();
 
@@ -135,14 +136,7 @@ public class MetricsController {
     private void loadPatientsIntoCombo() {
         new Thread(() -> {
             try {
-                List<User> patients;
-                if ("admin".equals(loggedInDoctor.getRole())) {
-                    // El admin ve TODOS los pacientes del sistema
-                    patients = patientDAO.getAllPatients();
-                } else {
-                    // El médico solo ve sus pacientes asignados
-                    patients = patientDAO.getPatientsByDoctor(loggedInDoctor.getUid());
-                }
+                List<User> patients = getPatientsForUser(loggedInDoctor);
                 Platform.runLater(() -> comboPatients.setItems(FXCollections.observableArrayList(patients)));
             } catch (Exception e) {
                 e.printStackTrace();
@@ -155,7 +149,7 @@ public class MetricsController {
     private void loadMetricsForPatient(String patientId) {
         new Thread(() -> {
             try {
-                List<Metric> history = metricDAO.getMetricsByPatient(patientId);
+                List<Metric> history = getMetricsByPatientId(patientId);
                 Platform.runLater(() -> {
                     currentPatientHistory = history; // Guardar respaldo
                     applyTimeFilter(); // Aplicar el filtro que a su vez llena la tabla y gráficas
@@ -341,9 +335,13 @@ public class MetricsController {
             new Thread(() -> {
                 try {
                     if (isNewRecord) {
-                        metricDAO.saveMetric(metricToProcess);
+                        // Genera un ID nuevo para la métrica
+                        String newId = metricDao.createDocumentId();
+                        // Asigna el ID al objeto y lo guarda en Firestore
+                        metricToProcess.setId(newId);
+                        metricDao.save(newId, metricToProcess);
                     } else {
-                        metricDAO.updateMetric(metricToProcess);
+                        metricDao.save(metricToProcess.getId(), metricToProcess);
                     }
 
                     Platform.runLater(() -> {
@@ -462,7 +460,7 @@ public class MetricsController {
 
         new Thread(() -> {
             try {
-                metricDAO.deleteMetric(metricId);
+                metricDao.delete(metricId);
                 Platform.runLater(() -> {
                     onClearForm();
                     loadMetricsForPatient(pId);
@@ -488,5 +486,52 @@ public class MetricsController {
         tableMetrics.getSelectionModel().clearSelection();
 
         btnSave.setText("Guardar");
+    }
+
+    // Obtiene la lista de pacientes visibles para el usuario actual
+    private List<User> getPatientsForUser(User user) throws Exception {
+        // Lista final de pacientes
+        List<User> result = new ArrayList<>();
+        // Consulta todos los usuarios con rol de paciente
+        List<User> patients = userDao.getByField("role", "patient");
+        // Filtra según si es admin o médico
+        for (User patient : patients) {
+            if ("admin".equals(user.getRole())) {
+                result.add(patient);
+            } else if (user.getUid() != null && user.getUid().equals(patient.getAssignedDoctorId())) {
+                result.add(patient);
+            }
+        }
+        // Retorna la lista filtrada
+        return result;
+    }
+
+    // Obtiene el historial de métricas de un paciente y lo ordena por fecha
+    private List<Metric> getMetricsByPatientId(String patientId) throws Exception {
+        // Consulta todas las métricas del paciente
+        List<Metric> metrics = metricDao.getByField("patientId", patientId);
+        // Ordena las métricas de más reciente a más antigua
+        sortMetricsByTimestamp(metrics);
+        // Retorna la lista ordenada
+        return metrics;
+    }
+
+    // Ordena una lista de métricas por fecha de forma descendente
+    private void sortMetricsByTimestamp(List<Metric> metrics) {
+        Collections.sort(metrics, new Comparator<Metric>() {
+            @Override
+            public int compare(Metric first, Metric second) {
+                if (first.getTimestamp() == null && second.getTimestamp() == null) {
+                    return 0;
+                }
+                if (first.getTimestamp() == null) {
+                    return 1;
+                }
+                if (second.getTimestamp() == null) {
+                    return -1;
+                }
+                return second.getTimestamp().compareTo(first.getTimestamp());
+            }
+        });
     }
 }

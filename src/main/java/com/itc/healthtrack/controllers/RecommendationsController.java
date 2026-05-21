@@ -1,5 +1,6 @@
 package com.itc.healthtrack.controllers;
 
+import com.google.cloud.Timestamp;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -21,9 +22,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 //Controlador para la gestión de recomendaciones clínicas
@@ -37,7 +35,6 @@ public class RecommendationsController {
     @FXML private ListView<Recommendation> listHistory;  // Lista de recomendaciones históricas
 
     // Acceso a datos
-    // uwu
     private final PatientDAO patientDAO = new PatientDAO();
     private final MetricDAO metricDAO = new MetricDAO();
     private final RecommendationDAO recommendationDAO = new RecommendationDAO();
@@ -88,12 +85,8 @@ public class RecommendationsController {
                     setText(null);
                     setStyle(null);
                 } else {
-                    // Convertimos el timestamp Long a una fecha formateada
                     String date = item.getGeneratedAt() != null
-                            ? Instant.ofEpochMilli(item.getGeneratedAt())
-                                    .atZone(ZoneId.systemDefault())
-                                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
-                            : "";
+                            ? item.getGeneratedAt().toDate().toString().substring(0, 16) : "";
                     setText((item.getTitle() != null ? item.getTitle() : "Análisis") + "\n" + date);
                     setStyle("-fx-text-fill: #e0e0e0; -fx-font-size: 12px;");
                 }
@@ -419,14 +412,14 @@ public class RecommendationsController {
                 });
     }
 
-    // Guarda el análisis clínico generado como un documento Recommendation en Firestore
-    // Recarga la lista de historial después de confirmar el guardado
+    /*Guarda el análisis clínico generado como un documento Recommendation en Firestore
+    Recarga la lista de historial después de confirmar el guardado */
     private void persistRecommendation(String patientId, String analysisText) {
         new Thread(() -> {
             try {
                 Recommendation rec = new Recommendation();
                 rec.setPatientId(patientId);
-                rec.setGeneratedAt(System.currentTimeMillis()); // Usamos timestamp en milisegundos
+                rec.setGeneratedAt(Timestamp.now());
                 rec.setType("suggestion");
                 rec.setTitle("Análisis Clínico Automático");
                 rec.setMessage(analysisText);

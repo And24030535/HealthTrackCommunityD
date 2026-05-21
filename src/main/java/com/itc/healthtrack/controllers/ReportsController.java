@@ -1,7 +1,6 @@
 package com.itc.healthtrack.controllers;
 
-import com.itc.healthtrack.dao.MetricDAO;
-import com.itc.healthtrack.dao.PatientDAO;
+import com.itc.healthtrack.dao.GenericDAO;
 import com.itc.healthtrack.models.Metric;
 import com.itc.healthtrack.models.User;
 import com.itextpdf.io.image.ImageData;
@@ -33,6 +32,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 //Controlador encargado de exportar el historial clinico a formatos de reporte (PDF)
@@ -43,8 +44,8 @@ public class ReportsController {
     @FXML private Label lblStatus;               // Etiqueta para mensajes de estado/progreso
 
     // Acceso a datos
-    private final PatientDAO patientDAO = new PatientDAO();
-    private final MetricDAO metricDAO = new MetricDAO();
+    private final GenericDAO<User> userDao = new GenericDAO<>(User.class, "users");
+    private final GenericDAO<Metric> metricDao = new GenericDAO<>(Metric.class, "metrics");
     private User loggedInDoctor;
 
     /*Inicializa el controlador con los datos del usuario logeado
@@ -65,9 +66,7 @@ public class ReportsController {
     private void loadPatients() {
         new Thread(() -> {
             try {
-                List<User> patients = "admin".equals(loggedInDoctor.getRole())
-                        ? patientDAO.getAllPatients()
-                        : patientDAO.getPatientsByDoctor(loggedInDoctor.getUid());
+                List<User> patients = getPatientsForUser(loggedInDoctor);
                 Platform.runLater(() -> {
                     comboPatients.setItems(FXCollections.observableArrayList(patients));
                 });
@@ -107,7 +106,7 @@ public class ReportsController {
             new Thread(() -> {
                 try {
                     // Descargar todo el historial del paciente
-                    List<Metric> history = metricDAO.getMetricsByPatient(selectedPatient.getUid());
+                    List<Metric> history = getMetricsByPatientId(selectedPatient.getUid());
 
                     // Los snapshots de gráficos deben tomarse en el hilo FX
                     Platform.runLater(() -> {
@@ -349,7 +348,7 @@ public class ReportsController {
             // Generar el archivo en hilo de fondo
             new Thread(() -> {
                 try {
-                    List<Metric> history = metricDAO.getMetricsByPatient(selectedPatient.getUid());
+                    List<Metric> history = getMetricsByPatientId(selectedPatient.getUid());
                     generateExcel(file.getAbsolutePath(), selectedPatient, history);
 
                     Platform.runLater(() -> {
@@ -430,5 +429,52 @@ public class ReportsController {
             workbook.write(fileOut);
         }
         workbook.close();
+    }
+
+    // Obtiene la lista de pacientes visibles para el usuario logeado
+    private List<User> getPatientsForUser(User user) throws Exception {
+        // Lista final de pacientes
+        List<User> result = new ArrayList<>();
+        // Consulta todos los usuarios con rol de paciente
+        List<User> patients = userDao.getByField("role", "patient");
+        // Filtra según el rol del usuario actual
+        for (User patient : patients) {
+            if ("admin".equals(user.getRole())) {
+                result.add(patient);
+            } else if (user.getUid() != null && user.getUid().equals(patient.getAssignedDoctorId())) {
+                result.add(patient);
+            }
+        }
+        // Devuelve la lista filtrada
+        return result;
+    }
+
+    // Obtiene el historial de métricas de un paciente y lo ordena por fecha
+    private List<Metric> getMetricsByPatientId(String patientId) throws Exception {
+        // Consulta todas las métricas del paciente
+        List<Metric> metrics = metricDao.getByField("patientId", patientId);
+        // Ordena las métricas de más reciente a más antigua
+        sortMetricsByTimestamp(metrics);
+        // Devuelve la lista ordenada
+        return metrics;
+    }
+
+    // Ordena las métricas por fecha descendente
+    private void sortMetricsByTimestamp(List<Metric> metrics) {
+        Collections.sort(metrics, new Comparator<Metric>() {
+            @Override
+            public int compare(Metric first, Metric second) {
+                if (first.getTimestamp() == null && second.getTimestamp() == null) {
+                    return 0;
+                }
+                if (first.getTimestamp() == null) {
+                    return 1;
+                }
+                if (second.getTimestamp() == null) {
+                    return -1;
+                }
+                return second.getTimestamp().compareTo(first.getTimestamp());
+            }
+        });
     }
 }

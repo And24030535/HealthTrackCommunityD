@@ -1,7 +1,6 @@
 package com.itc.healthtrack.controllers;
 
-import com.itc.healthtrack.dao.PatientDAO;
-import com.itc.healthtrack.dao.UserDAO;
+import com.itc.healthtrack.dao.GenericDAO;
 import com.itc.healthtrack.models.User;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -11,6 +10,7 @@ import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -30,8 +30,7 @@ public class PatientsController {
     @FXML private TableColumn<User, String> colFirstName, colLastName, colEmail, colGender;
 
     // Variables de logica de negocio
-    private final PatientDAO patientDAO = new PatientDAO();
-    private final UserDAO userDAO = new UserDAO();
+    private final GenericDAO<User> userDao = new GenericDAO<>(User.class, "users");
     private ObservableList<User> patientsObservableList = FXCollections.observableArrayList();
 
     private User loggedInDoctor;
@@ -71,9 +70,7 @@ public class PatientsController {
     private void loadPatients() {
         new Thread(() -> {
             try {
-                List<User> list = "admin".equals(loggedInDoctor.getRole())
-                        ? patientDAO.getAllPatients()
-                        : patientDAO.getPatientsByDoctor(loggedInDoctor.getUid());
+                List<User> list = getPatientsForDoctor(loggedInDoctor);
                 Platform.runLater(() -> {
                     patientsObservableList.clear();
                     patientsObservableList.addAll(list);
@@ -107,7 +104,11 @@ public class PatientsController {
                 // Guardamos en un hilo nuevo
                 new Thread(() -> {
                     try {
-                        userDAO.saveUser(newPatient); // Usamos UserDAO porque inserta el UID
+                        // Genera un ID nuevo para el paciente en Firestore
+                        String newId = userDao.createDocumentId();
+                        // Asigna el ID al objeto y guarda el paciente completo
+                        newPatient.setUid(newId);
+                        userDao.save(newId, newPatient);
                         Platform.runLater(() -> {
                             onClearForm();
                             loadPatients();
@@ -127,7 +128,7 @@ public class PatientsController {
 
                 new Thread(() -> {
                     try {
-                        patientDAO.updatePatient(selectedPatient);
+                        userDao.save(selectedPatient.getUid(), selectedPatient);
                         Platform.runLater(() -> {
                             onClearForm();
                             loadPatients();
@@ -148,7 +149,7 @@ public class PatientsController {
         if (selectedPatient != null) {
             new Thread(() -> {
                 try {
-                    patientDAO.deletePatient(selectedPatient.getUid());
+                    userDao.delete(selectedPatient.getUid());
                     Platform.runLater(() -> {
                         onClearForm();
                         loadPatients();
@@ -185,5 +186,25 @@ public class PatientsController {
         comboGender.setValue(p.getGender());
         txtHeight.setText(p.getHeight() != null ? String.valueOf(p.getHeight()) : "");
         txtPassword.clear();
+    }
+
+    // Obtiene la lista de pacientes visibles para el usuario logeado
+    private List<User> getPatientsForDoctor(User doctor) throws Exception {
+        // Lista que se devolverá al final
+        List<User> result = new ArrayList<>();
+        // Consulta todos los usuarios con rol de paciente
+        List<User> patients = userDao.getByField("role", "patient");
+        // Recorre cada paciente para filtrar según el rol del usuario logeado
+        for (User patient : patients) {
+            if ("admin".equals(doctor.getRole())) {
+                // El administrador puede ver todos los pacientes
+                result.add(patient);
+            } else if (doctor.getUid() != null && doctor.getUid().equals(patient.getAssignedDoctorId())) {
+                // El médico solo ve a sus pacientes asignados
+                result.add(patient);
+            }
+        }
+        // Retorna la lista final de pacientes filtrados
+        return result;
     }
 }

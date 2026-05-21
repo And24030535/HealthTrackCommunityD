@@ -1,7 +1,6 @@
 package com.itc.healthtrack.controllers;
 
-import com.itc.healthtrack.dao.PatientDAO;
-import com.itc.healthtrack.dao.UserDAO;
+import com.itc.healthtrack.dao.GenericDAO;
 import com.itc.healthtrack.models.User;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -14,9 +13,10 @@ import javafx.collections.transformation.FilteredList;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 
 //Controlador del Panel de Administración
 // Gestiona la visualización de estadísticas de usuarios, búsqueda, eliminación y cambio de roles
@@ -39,8 +39,7 @@ public class AdminController {
     @FXML private ComboBox<String> cbRoleFilter;                 // Filtro por rol
 
     // Datos y controladores
-    private final PatientDAO patientDAO = new PatientDAO();      // Acceso a datos de pacientes
-    private final UserDAO userDAO = new UserDAO();               // Acceso a datos de usuarios
+    private final GenericDAO<User> userDao = new GenericDAO<>(User.class, "users"); // Acceso a datos de usuarios
     private final ObservableList<User> usersObservableList = FXCollections.observableArrayList();  // Lista observable de usuarios
     private FilteredList<User> filteredList;                     // Lista filtrada para búsqueda
 
@@ -126,7 +125,7 @@ public class AdminController {
         new Thread(() -> {
             try {
                 // Obtiene todos los usuarios de Firestore
-                List<User> allUsers = userDAO.getAllUsers();
+                List<User> allUsers = userDao.getAll();
 
                 // Crea un mapa para convertir IDs de médicos a sus nombres
                 Map<String, String> doctorNameMap = new HashMap<>();
@@ -149,8 +148,19 @@ public class AdminController {
                 }
 
                 // Cuenta cuántos médicos y pacientes hay
-                long doctors  = allUsers.stream().filter(u -> "doctor".equals(u.getRole())).count();
-                long patients = allUsers.stream().filter(u -> "patient".equals(u.getRole())).count();
+                int doctors = 0;
+                int patients = 0;
+                for (User user : allUsers) {
+                    if ("doctor".equals(user.getRole())) {
+                        doctors++;
+                    }
+                    if ("patient".equals(user.getRole())) {
+                        patients++;
+                    }
+                }
+                // Copias finales para usarlas dentro del hilo de la interfaz
+                final int doctorCount = doctors;
+                final int patientCount = patients;
 
                 // Ejecuta en el hilo de la interfaz gráfica
                 Platform.runLater(() -> {
@@ -159,8 +169,8 @@ public class AdminController {
 
                     // Actualiza las etiquetas de estadísticas
                     lblTotalUsers.setText(String.valueOf(allUsers.size()));
-                    lblTotalDoctors.setText(String.valueOf(doctors));
-                    lblTotalPatients.setText(String.valueOf(patients));
+                    lblTotalDoctors.setText(String.valueOf(doctorCount));
+                    lblTotalPatients.setText(String.valueOf(patientCount));
 
                     applyFilter();  // Aplica el filtro actual
                     lblStatus.setText("Lista actualizada\n" + allUsers.size() + " usuario(s) encontrado(s)");
@@ -265,7 +275,7 @@ public class AdminController {
             final int finalRow = row;
             new Thread(() -> {
                 try {
-                    int count = patientDAO.getPatientsByDoctor(selectedUser.getUid()).size();
+                    int count = getPatientsByDoctorId(selectedUser.getUid()).size();
                     Platform.runLater(() -> addDetailRow(grid, finalRow, "Pacientes", count + " paciente(s)"));
                 } catch (Exception e) {
                     Platform.runLater(() -> addDetailRow(grid, finalRow, "Pacientes", "Error al cargar"));
@@ -333,11 +343,11 @@ public class AdminController {
         // Ejecuta la eliminación en un hilo de fondo para no bloquear la interfaz
         new Thread(() -> {
             try {
-                userDAO.deleteUser(userId);
+                userDao.delete(userId);
 
                 // Si era un médico, reasigna sus pacientes a otro médico
                 if ("doctor".equals(selectedUser.getRole())) {
-                    patientDAO.reassignPatients(userId, null);
+                    reassignPatients(userId);
                 }
 
                 // Recarga la tabla en el hilo de la interfaz
@@ -385,7 +395,8 @@ public class AdminController {
             // Actualiza el rol en la base de datos
             new Thread(() -> {
                 try {
-                    userDAO.updateUserRole(selectedUser.getUid(), newRole);
+                    selectedUser.setRole(newRole);
+                    userDao.save(selectedUser.getUid(), selectedUser);
                     Platform.runLater(() -> {
                         loadAllUsers();  // Recarga la tabla
                         lblStatus.setText("Rol actualizado a: " + newRoleLabel); // Muestra en español
@@ -400,5 +411,53 @@ public class AdminController {
                 }
             }).start();
         });
+    }
+
+    // Obtiene la lista de pacientes asignados a un médico específico
+    private List<User> getPatientsByDoctorId(String doctorId) throws Exception {
+        // Lista final de pacientes asignados
+        List<User> result = new ArrayList<>();
+        // Consulta todos los usuarios con rol de paciente
+        List<User> patients = userDao.getByField("role", "patient");
+        // Recorre cada paciente para validar el médico asignado
+        for (User patient : patients) {
+            if (doctorId != null && doctorId.equals(patient.getAssignedDoctorId())) {
+                result.add(patient);
+            }
+        }
+        // Devuelve la lista filtrada
+        return result;
+    }
+
+    // Reasigna o desasigna pacientes cuando se elimina un médico
+    private void reassignPatients(String doctorId) throws Exception {
+        // Obtiene los pacientes que pertenecen al médico eliminado
+        List<User> patients = getPatientsByDoctorId(doctorId);
+        // Obtiene todos los doctores registrados en el sistema
+        List<User> doctors = userDao.getByField("role", "doctor");
+        // Lista de doctores disponibles sin el médico eliminado
+        List<User> availableDoctors = new ArrayList<>();
+        for (User doctor : doctors) {
+            if (doctorId == null || !doctorId.equals(doctor.getUid())) {
+                availableDoctors.add(doctor);
+            }
+        }
+
+        if (!availableDoctors.isEmpty()) {
+            // Reasigna pacientes en forma circular cuando hay doctores disponibles
+            int doctorIndex = 0;
+            for (User patient : patients) {
+                User newDoctor = availableDoctors.get(doctorIndex % availableDoctors.size());
+                patient.setAssignedDoctorId(newDoctor.getUid());
+                userDao.save(patient.getUid(), patient);
+                doctorIndex++;
+            }
+        } else {
+            // Si no hay doctores, se desasigna el médico de cada paciente
+            for (User patient : patients) {
+                patient.setAssignedDoctorId(null);
+                userDao.save(patient.getUid(), patient);
+            }
+        }
     }
 }

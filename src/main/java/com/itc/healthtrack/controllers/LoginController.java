@@ -1,7 +1,6 @@
 package com.itc.healthtrack.controllers;
 
-import com.itc.healthtrack.dao.PatientDAO;
-import com.itc.healthtrack.dao.UserDAO;
+import com.itc.healthtrack.dao.GenericDAO;
 import com.itc.healthtrack.models.User;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
@@ -31,8 +30,7 @@ public class LoginController {
     @FXML private Button loginButton;            // Botón de inicio de sesión
 
     //Acceso a datos
-    private final UserDAO userDAO = new UserDAO();
-    private final PatientDAO patientDAO = new PatientDAO();
+    private final GenericDAO<User> userDao = new GenericDAO<>(User.class, "users");
 
     //Navega a la pantalla de crear nueva cuenta
 
@@ -72,7 +70,7 @@ public class LoginController {
         new Thread(() -> {
             try {
                 // Consulta a Firestore con correo y contraseña
-                User currentUser = userDAO.authenticateUser(email, password);
+                User currentUser = findUserByCredentials(email, password);
 
                 Platform.runLater(() -> {
                     if (currentUser != null) {
@@ -82,10 +80,13 @@ public class LoginController {
 
                             new Thread(() -> {
                                 try {
-                                    List<User> doctors = patientDAO.getAllDoctors();
+                                    // Busca todos los doctores disponibles
+                                    List<User> doctors = userDao.getByField("role", "doctor");
                                     if (!doctors.isEmpty()) {
+                                        // Selecciona un doctor aleatorio y lo asigna al paciente
                                         User randomDoctor = doctors.get((int) (Math.random() * doctors.size()));
-                                        patientDAO.assignDoctorToPatient(currentUser.getUid(), randomDoctor.getUid());
+                                        currentUser.setAssignedDoctorId(randomDoctor.getUid());
+                                        userDao.save(currentUser.getUid(), currentUser);
                                         System.out.println("Paciente " + currentUser.getFirstName() + " asignado al doctor: " + randomDoctor.getFirstName() + " " + randomDoctor.getLastName());
                                     }
                                 } catch (Exception e) {
@@ -138,5 +139,19 @@ public class LoginController {
             e.printStackTrace();
             showError("Error crítico al cargar la interfaz principal.");
         }
+    }
+
+    // Busca un usuario por correo y contraseña usando una consulta simple
+    private User findUserByCredentials(String email, String password) throws Exception {
+        // Lista de usuarios que coinciden con el correo
+        List<User> users = userDao.getByField("email", email);
+        // Recorre cada usuario para validar la contraseña
+        for (User user : users) {
+            if (password.equals(user.getPassword())) {
+                return user;
+            }
+        }
+        // Si no hay coincidencias válidas, retorna null
+        return null;
     }
 }
