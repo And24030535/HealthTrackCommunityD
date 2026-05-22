@@ -11,7 +11,7 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.paint.Color;
 import javafx.collections.transformation.FilteredList;
 import javafx.scene.layout.GridPane;
-import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -293,10 +293,7 @@ public class AdminController {
         dp.setHeader(null);
         dp.setGraphic(null);
         dp.getButtonTypes().add(ButtonType.CLOSE);
-        dp.setStyle("-fx-background-color: #ffffff;");
-
-        ((Button) dp.lookupButton(ButtonType.CLOSE))
-                .setStyle("-fx-background-color: #6a6a6a; -fx-text-fill: #020000; -fx-cursor: hand; -fx-padding: 6 20;");
+        applyWhiteDialogStyle(dp);
 
         dialog.showAndWait();
     }
@@ -316,56 +313,223 @@ public class AdminController {
         return row + 1;          // Devuelve la siguiente fila disponible
     }
 
-    // Eliminar usuario
-    //- No permite eliminar si ningún usuario está seleccionado
-    //- No permite que un admin se elimine a sí mismo
-    //Si el usuario a eliminar es un médico, reasigna automáticamente sus pacientes a otro médico disponible
+    // Punto de entrada para eliminación: separa lógica de médico vs. otros roles
     @FXML
     protected void onDeleteUser() {
         if (selectedUser == null) {
-            lblStatus.setText("Selecciona un usuario de la tabla para eliminar");
+            lblStatus.setText("Selecciona un usuario de la tabla para eliminar.");
             lblStatus.setTextFill(Color.web("#ff5252"));
             return;
         }
-
-        // no permite que un admin se elimine a sí mismo
+        // El admin no puede eliminarse a sí mismo
         if (selectedUser.getUid() != null && selectedUser.getUid().equals(loggedInAdmin.getUid())) {
-            lblStatus.setText("No puedes eliminar tu propia cuenta de administrador");
+            lblStatus.setText("No puedes eliminar tu propia cuenta de administrador.");
             lblStatus.setTextFill(Color.web("#ff9800"));
             return;
         }
+        // Los médicos requieren reasignación obligatoria antes de poder eliminarse
+        if ("doctor".equals(selectedUser.getRole())) {
+            handleDoctorDeletion();
+        } else {
+            handleNonDoctorDeletion();
+        }
+    }
 
-        String userId = selectedUser.getUid();
-        String userName = selectedUser.getFirstName() + " " + selectedUser.getLastName();
-        lblStatus.setText("Eliminando usuario: " + userName + "...");
-        lblStatus.setTextFill(Color.web("#ffffff"));
+    // Verifica cuántos pacientes tiene el médico y decide el flujo de eliminación
+    private void handleDoctorDeletion() {
+        lblStatus.setText("Verificando pacientes asignados al médico...");
+        lblStatus.setTextFill(Color.web("#aaaaaa"));
 
-        // Ejecuta la eliminación en un hilo de fondo para no bloquear la interfaz
+        final String doctorId   = selectedUser.getUid();
+        final String doctorName = selectedUser.getFirstName() + " " + selectedUser.getLastName();
+
         new Thread(() -> {
             try {
-                userDao.delete(userId);
+                // Consultamos los pacientes del médico y los demás médicos disponibles
+                List<User> linkedPatients = getPatientsByDoctorId(doctorId);
+                List<User> otherDoctors   = userDao.getByField("role", "doctor");
+                // Quitamos al médico que se va a eliminar de la lista de opciones
+                otherDoctors.removeIf(d -> doctorId.equals(d.getUid()));
 
-                // Si era un médico, reasigna sus pacientes a otro médico
-                if ("doctor".equals(selectedUser.getRole())) {
-                    reassignPatients(userId);
-                }
-
-                // Recarga la tabla en el hilo de la interfaz
                 Platform.runLater(() -> {
-                    selectedUser = null;
-                    tableUsers.getSelectionModel().clearSelection();
-                    loadAllUsers();  // Recarga para reflejar los cambios
-                    lblStatus.setText("Usuario eliminado correctamente");
-                    lblStatus.setTextFill(Color.web("#4caf50"));
+                    if (linkedPatients.isEmpty()) {
+                        // Sin pacientes: confirmación simple
+                        showSimpleDoctorDeleteDialog(doctorName, doctorId);
+                    } else {
+                        // Con pacientes: reasignación obligatoria antes de eliminar
+                        showReassignmentDialog(doctorName, doctorId, linkedPatients, otherDoctors);
+                    }
                 });
             } catch (Exception e) {
                 Platform.runLater(() -> {
-                    lblStatus.setText("Error al eliminar el usuario, intenta de nuevo");
+                    lblStatus.setText("Error al verificar pacientes del médico.");
                     lblStatus.setTextFill(Color.web("#ff5252"));
                 });
                 e.printStackTrace();
             }
         }).start();
+    }
+
+    // Diálogo de reasignación: el admin elige el médico receptor antes de confirmar eliminación
+    private void showReassignmentDialog(String doctorName, String doctorId,
+                                        List<User> patients, List<User> otherDoctors) {
+        // Si no hay otro médico disponible, bloqueamos la eliminación
+        if (otherDoctors.isEmpty()) {
+            Alert blocked = new Alert(Alert.AlertType.WARNING);
+            blocked.setTitle("Eliminación bloqueada");
+            blocked.setHeaderText("El Dr. " + doctorName + " tiene " + patients.size() + " paciente(s) asignado(s)");
+            blocked.setContentText("No hay otros médicos disponibles para recibir los pacientes.\n"
+                    + "Registra al menos un médico más antes de intentar esta eliminación.");
+            applyWhiteDialogStyle(blocked.getDialogPane());
+            blocked.showAndWait();
+            lblStatus.setText("Eliminación cancelada: no hay médicos disponibles para reasignación.");
+            lblStatus.setTextFill(Color.web("#ff9800"));
+            return;
+        }
+
+        // ComboBox con los médicos que pueden recibir los pacientes
+        ComboBox<User> comboNuevoDoc = new ComboBox<>();
+        comboNuevoDoc.setMaxWidth(Double.MAX_VALUE);
+        comboNuevoDoc.setItems(FXCollections.observableArrayList(otherDoctors));
+        comboNuevoDoc.setCellFactory(lv -> new ListCell<User>() {
+            @Override protected void updateItem(User u, boolean empty) {
+                super.updateItem(u, empty);
+                setText(empty || u == null ? null : "Dr. " + u.getFirstName() + " " + u.getLastName());
+            }
+        });
+        comboNuevoDoc.setButtonCell(new ListCell<User>() {
+            @Override protected void updateItem(User u, boolean empty) {
+                super.updateItem(u, empty);
+                setText(empty || u == null ? null : "Dr. " + u.getFirstName() + " " + u.getLastName());
+            }
+        });
+        comboNuevoDoc.getSelectionModel().selectFirst();
+
+        Label lblInfo = new Label("El Dr. " + doctorName + " tiene "
+                + patients.size() + " paciente(s). Selecciona el médico que los recibirá:");
+        lblInfo.setStyle("-fx-text-fill: #222222; -fx-font-weight: bold;");
+        lblInfo.setWrapText(true);
+
+        VBox content = new VBox(10, lblInfo, comboNuevoDoc);
+        content.setStyle("-fx-padding: 10;");
+
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Reasignación Obligatoria");
+        dialog.setHeaderText("Reasignar pacientes antes de eliminar al médico");
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        applyWhiteDialogStyle(dialog.getDialogPane());
+
+        dialog.showAndWait().ifPresent(btn -> {
+            if (btn != ButtonType.OK) return;
+
+            User nuevoMedico = comboNuevoDoc.getValue();
+            if (nuevoMedico == null) return;
+
+            lblStatus.setText("Reasignando pacientes y eliminando médico...");
+            lblStatus.setTextFill(Color.web("#ffffff"));
+
+            new Thread(() -> {
+                try {
+                    // Recopilamos los IDs de los pacientes que se reasignarán
+                    List<String> patientIds = new ArrayList<>();
+                    for (User p : patients) patientIds.add(p.getUid());
+
+                    // Preparamos los campos a actualizar en cada paciente
+                    Map<String, Object> campos = new HashMap<>();
+                    campos.put("assignedDoctorId",   nuevoMedico.getUid());
+                    campos.put("assignedDoctorName",
+                            nuevoMedico.getFirstName() + " " + nuevoMedico.getLastName());
+
+                    // Batch Update atómico: todos los pacientes se actualizan en una sola operación
+                    userDao.batchUpdateFields(patientIds, campos);
+
+                    // Solo después de confirmar el batch, eliminamos al médico
+                    userDao.delete(doctorId);
+
+                    Platform.runLater(() -> {
+                        selectedUser = null;
+                        tableUsers.getSelectionModel().clearSelection();
+                        loadAllUsers();
+                        lblStatus.setText(patients.size() + " paciente(s) reasignado(s) al Dr. "
+                                + nuevoMedico.getLastName() + ". Médico eliminado correctamente.");
+                        lblStatus.setTextFill(Color.web("#4caf50"));
+                    });
+                } catch (Exception e) {
+                    Platform.runLater(() -> {
+                        lblStatus.setText("Error durante la reasignación o eliminación. Intenta de nuevo.");
+                        lblStatus.setTextFill(Color.web("#ff5252"));
+                    });
+                    e.printStackTrace();
+                }
+            }).start();
+        });
+    }
+
+    // Confirmación simple cuando el médico no tiene pacientes — solo pide confirmar
+    private void showSimpleDoctorDeleteDialog(String doctorName, String doctorId) {
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Confirmar eliminación");
+        confirm.setHeaderText("Eliminar al Dr. " + doctorName);
+        confirm.setContentText("Este médico no tiene pacientes asignados.\n¿Confirmas la eliminación?");
+        applyWhiteDialogStyle(confirm.getDialogPane());
+
+        confirm.showAndWait().ifPresent(result -> {
+            if (result != ButtonType.OK) return;
+            new Thread(() -> {
+                try {
+                    userDao.delete(doctorId);
+                    Platform.runLater(() -> {
+                        selectedUser = null;
+                        tableUsers.getSelectionModel().clearSelection();
+                        loadAllUsers();
+                        lblStatus.setText("Médico eliminado correctamente.");
+                        lblStatus.setTextFill(Color.web("#4caf50"));
+                    });
+                } catch (Exception e) {
+                    Platform.runLater(() -> {
+                        lblStatus.setText("Error al eliminar el médico.");
+                        lblStatus.setTextFill(Color.web("#ff5252"));
+                    });
+                    e.printStackTrace();
+                }
+            }).start();
+        });
+    }
+
+    // Confirmación simple para pacientes y admins — sin lógica de reasignación
+    private void handleNonDoctorDeletion() {
+        String userName = selectedUser.getFirstName() + " " + selectedUser.getLastName();
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Confirmar eliminación");
+        confirm.setHeaderText("Eliminar usuario");
+        confirm.setContentText("¿Eliminar al usuario " + userName + "?\n\nEsta acción no se puede deshacer.");
+        applyWhiteDialogStyle(confirm.getDialogPane());
+
+        confirm.showAndWait().ifPresent(result -> {
+            if (result != ButtonType.OK) return;
+            String userId = selectedUser.getUid();
+            lblStatus.setText("Eliminando...");
+            lblStatus.setTextFill(Color.web("#ffffff"));
+            new Thread(() -> {
+                try {
+                    userDao.delete(userId);
+                    Platform.runLater(() -> {
+                        selectedUser = null;
+                        tableUsers.getSelectionModel().clearSelection();
+                        loadAllUsers();
+                        lblStatus.setText("Usuario eliminado correctamente.");
+                        lblStatus.setTextFill(Color.web("#4caf50"));
+                    });
+                } catch (Exception e) {
+                    Platform.runLater(() -> {
+                        lblStatus.setText("Error al eliminar el usuario.");
+                        lblStatus.setTextFill(Color.web("#ff5252"));
+                    });
+                    e.printStackTrace();
+                }
+            }).start();
+        });
     }
 
     // Cambiar rol de un usuario
@@ -384,7 +548,7 @@ public class AdminController {
         dialog.setTitle("Cambiar Rol");
         dialog.setHeaderText("Usuario: " + selectedUser.getFirstName() + " " + selectedUser.getLastName());
         dialog.setContentText("Selecciona el nuevo rol:");
-        dialog.getDialogPane().setStyle("-fx-background-color: #1e1e1e; -fx-font-size: 13px;");
+        applyWhiteDialogStyle(dialog.getDialogPane());
 
         // Si el usuario elige un nuevo rol
         dialog.showAndWait().ifPresent(newRoleLabel -> {
@@ -413,6 +577,111 @@ public class AdminController {
         });
     }
 
+    // Asigna un médico a un paciente seleccionado desde la tabla
+    @FXML
+    protected void onAssignDoctor() {
+        if (selectedUser == null || !"patient".equals(selectedUser.getRole())) {
+            lblStatus.setText("Selecciona un paciente de la tabla para asignar un médico.");
+            lblStatus.setTextFill(Color.web("#ff9800"));
+            return;
+        }
+
+        // Cargamos la lista de médicos en un hilo de fondo antes de mostrar el diálogo
+        lblStatus.setText("Cargando médicos disponibles...");
+        lblStatus.setTextFill(Color.web("#aaaaaa"));
+
+        new Thread(() -> {
+            try {
+                List<User> doctors = userDao.getByField("role", "doctor");
+
+                Platform.runLater(() -> {
+                    if (doctors.isEmpty()) {
+                        lblStatus.setText("No hay médicos registrados en el sistema.");
+                        lblStatus.setTextFill(Color.web("#ff9800"));
+                        return;
+                    }
+
+                    // ComboBox con todos los médicos disponibles
+                    ComboBox<User> comboDoc = new ComboBox<>();
+                    comboDoc.setMaxWidth(Double.MAX_VALUE);
+                    comboDoc.setItems(FXCollections.observableArrayList(doctors));
+
+                    // Muestra el nombre completo de cada médico en la lista
+                    comboDoc.setCellFactory(lv -> new ListCell<User>() {
+                        @Override protected void updateItem(User u, boolean empty) {
+                            super.updateItem(u, empty);
+                            setText(empty || u == null ? null : "Dr. " + u.getFirstName() + " " + u.getLastName());
+                        }
+                    });
+                    comboDoc.setButtonCell(new ListCell<User>() {
+                        @Override protected void updateItem(User u, boolean empty) {
+                            super.updateItem(u, empty);
+                            setText(empty || u == null ? null : "Dr. " + u.getFirstName() + " " + u.getLastName());
+                        }
+                    });
+
+                    // Pre-seleccionamos al médico actual del paciente si ya tiene uno
+                    if (selectedUser.getAssignedDoctorId() != null) {
+                        doctors.stream()
+                               .filter(d -> selectedUser.getAssignedDoctorId().equals(d.getUid()))
+                               .findFirst()
+                               .ifPresent(comboDoc::setValue);
+                    }
+
+                    VBox content = new VBox(10,
+                        new Label("Paciente: " + selectedUser.getFirstName() + " " + selectedUser.getLastName()),
+                        new Label("Selecciona el médico a asignar:"),
+                        comboDoc
+                    );
+                    content.setStyle("-fx-padding: 10;");
+                    content.getChildren().get(0).setStyle("-fx-text-fill: #222222; -fx-font-weight: bold;");
+                    content.getChildren().get(1).setStyle("-fx-text-fill: #444444;");
+
+                    Dialog<ButtonType> dialog = new Dialog<>();
+                    dialog.setTitle("Asignar Médico");
+                    dialog.setHeaderText("Asignación de médico al paciente");
+                    dialog.getDialogPane().setContent(content);
+                    dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+                    applyWhiteDialogStyle(dialog.getDialogPane());
+
+                    dialog.showAndWait().ifPresent(btn -> {
+                        if (btn != ButtonType.OK) return;
+
+                        User chosenDoctor = comboDoc.getValue();
+                        if (chosenDoctor == null) return;
+
+                        // Actualizamos el paciente en Firestore con el nuevo médico
+                        selectedUser.setAssignedDoctorId(chosenDoctor.getUid());
+                        selectedUser.setAssignedDoctorName(chosenDoctor.getFirstName() + " " + chosenDoctor.getLastName());
+
+                        new Thread(() -> {
+                            try {
+                                userDao.save(selectedUser.getUid(), selectedUser);
+                                Platform.runLater(() -> {
+                                    loadAllUsers();
+                                    lblStatus.setText("Médico asignado correctamente: Dr. " + chosenDoctor.getLastName());
+                                    lblStatus.setTextFill(Color.web("#4caf50"));
+                                });
+                            } catch (Exception e) {
+                                Platform.runLater(() -> {
+                                    lblStatus.setText("Error al guardar la asignación.");
+                                    lblStatus.setTextFill(Color.web("#ff5252"));
+                                });
+                                e.printStackTrace();
+                            }
+                        }).start();
+                    });
+                });
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    lblStatus.setText("Error al cargar médicos.");
+                    lblStatus.setTextFill(Color.web("#ff5252"));
+                });
+                e.printStackTrace();
+            }
+        }).start();
+    }
+
     // Obtiene la lista de pacientes asignados a un médico específico
     private List<User> getPatientsByDoctorId(String doctorId) throws Exception {
         // Lista final de pacientes asignados
@@ -429,35 +698,24 @@ public class AdminController {
         return result;
     }
 
-    // Reasigna o desasigna pacientes cuando se elimina un médico
-    private void reassignPatients(String doctorId) throws Exception {
-        // Obtiene los pacientes que pertenecen al médico eliminado
-        List<User> patients = getPatientsByDoctorId(doctorId);
-        // Obtiene todos los doctores registrados en el sistema
-        List<User> doctors = userDao.getByField("role", "doctor");
-        // Lista de doctores disponibles sin el médico eliminado
-        List<User> availableDoctors = new ArrayList<>();
-        for (User doctor : doctors) {
-            if (doctorId == null || !doctorId.equals(doctor.getUid())) {
-                availableDoctors.add(doctor);
-            }
-        }
-
-        if (!availableDoctors.isEmpty()) {
-            // Reasigna pacientes en forma circular cuando hay doctores disponibles
-            int doctorIndex = 0;
-            for (User patient : patients) {
-                User newDoctor = availableDoctors.get(doctorIndex % availableDoctors.size());
-                patient.setAssignedDoctorId(newDoctor.getUid());
-                userDao.save(patient.getUid(), patient);
-                doctorIndex++;
-            }
-        } else {
-            // Si no hay doctores, se desasigna el médico de cada paciente
-            for (User patient : patients) {
-                patient.setAssignedDoctorId(null);
-                userDao.save(patient.getUid(), patient);
+    private void applyWhiteDialogStyle(DialogPane dp) {
+        dp.setStyle("-fx-background-color: #ffffff; -fx-font-size: 13px;");
+        javafx.scene.Node content = dp.lookup(".content.label");
+        if (content != null) content.setStyle("-fx-text-fill: #222222; -fx-font-size: 13px;");
+        javafx.scene.Node header = dp.lookup(".header-panel");
+        if (header != null) header.setStyle("-fx-background-color: #f5f5f5;");
+        javafx.scene.Node headerLabel = dp.lookup(".header-panel .label");
+        if (headerLabel != null) headerLabel.setStyle("-fx-text-fill: #111111; -fx-font-weight: bold;");
+        for (ButtonType bt : dp.getButtonTypes()) {
+            javafx.scene.Node node = dp.lookupButton(bt);
+            if (node instanceof Button) {
+                Button btn = (Button) node;
+                boolean cancel = (bt == ButtonType.CANCEL || bt == ButtonType.NO || bt == ButtonType.CLOSE);
+                btn.setStyle("-fx-background-color: " + (cancel ? "#9e9e9e" : "#2196f3") +
+                        "; -fx-text-fill: #ffffff; -fx-cursor: hand;" +
+                        " -fx-padding: 6 22; -fx-background-radius: 4;");
             }
         }
     }
+
 }

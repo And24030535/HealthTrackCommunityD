@@ -17,8 +17,6 @@ import javafx.scene.control.*;
 import javafx.scene.paint.Color;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
 public class MetricsController {
@@ -64,13 +62,13 @@ public class MetricsController {
         setupFilters();
 
         if ("patient".equals(user.getRole())) {
-            // Patients can only view and log their own metrics
+            // El paciente solo puede ver y registrar sus propias métricas
             comboPatients.getItems().add(user);
             comboPatients.getSelectionModel().selectFirst();
             comboPatients.setDisable(true);
             loadMetricsForPatient(user.getUid());
         } else {
-            // Doctors and admins see a dropdown of assigned patients
+            // Médicos y admins ven la lista desplegable de sus pacientes asignados
             loadPatientsIntoCombo();
             comboPatients.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
                 if (newVal != null) {
@@ -131,8 +129,7 @@ public class MetricsController {
         });
     }
 
-    /*Carga la lista de pacientes en el ComboBox
-     Si es admin, carga todos los pacientes; si es médico, solo sus pacientes */
+    // Carga la lista de pacientes visibles para el usuario logeado en el ComboBox
     private void loadPatientsIntoCombo() {
         new Thread(() -> {
             try {
@@ -187,6 +184,10 @@ public class MetricsController {
         // Filtrar las métricas según el período seleccionado
         List<Metric> filteredList = new ArrayList<>();
         for (Metric m : currentPatientHistory) {
+            if (m.getTimestamp() == null) {
+                if (limitSeconds == 0) filteredList.add(m); // sin fecha: incluir solo en historial completo
+                continue;
+            }
             long metricTime = m.getTimestamp().getSeconds();
             if (limitSeconds == 0 || (nowSeconds - metricTime) <= limitSeconds) {
                 filteredList.add(m);
@@ -424,8 +425,7 @@ public class MetricsController {
             alert.setTitle("Alerta Clínica — HealthTrack");
             alert.setHeaderText("Se detectaron valores fuera del rango clínico normal");
             alert.setContentText(message);
-            alert.getDialogPane().setStyle("-fx-background-color: #ffffff; -fx-font-size: 13px;");
-            alert.getDialogPane().lookup(".content.label").setStyle("-fx-text-fill: #000000;");
+            applyWhiteDialogStyle(alert.getDialogPane());
             alert.showAndWait();
 
             // Actualizar etiqueta de estado
@@ -436,9 +436,28 @@ public class MetricsController {
             User patient = comboPatients.getValue();
             if (patient != null) {
                 notificationService.notifyPatient(patient, "Valores clínicos críticos detectados en tu última medición, consulta a tu médico");
+
                 if (loggedInDoctor != null
                         && ("doctor".equals(loggedInDoctor.getRole()) || "admin".equals(loggedInDoctor.getRole()))) {
-                    notificationService.notifyDoctor(loggedInDoctor, "ALERTA: El paciente " + patient.getFirstName() + " " + patient.getLastName() + " tiene valores críticos registrados");
+                    // El médico o admin registró la métrica — se notifica directamente
+                    notificationService.notifyDoctor(loggedInDoctor, "ALERTA: El paciente "
+                            + patient.getFirstName() + " " + patient.getLastName()
+                            + " tiene valores críticos registrados");
+                } else if (patient.getAssignedDoctorId() != null && !patient.getAssignedDoctorId().isEmpty()) {
+                    // El paciente registró su propia métrica — buscar al médico asignado y notificarlo
+                    final String alertMsg = "ALERTA: El paciente "
+                            + patient.getFirstName() + " " + patient.getLastName()
+                            + " tiene valores críticos registrados";
+                    new Thread(() -> {
+                        try {
+                            User assignedDoctor = userDao.getById(patient.getAssignedDoctorId());
+                            if (assignedDoctor != null) {
+                                notificationService.notifyDoctor(assignedDoctor, alertMsg);
+                            }
+                        } catch (Exception e) {
+                            System.err.println("[MetricsController] Error al notificar al médico asignado: " + e.getMessage());
+                        }
+                    }).start();
                 }
             }
         });
@@ -488,50 +507,55 @@ public class MetricsController {
         btnSave.setText("Guardar");
     }
 
-    // Obtiene la lista de pacientes visibles para el usuario actual
+    // Obtiene la lista de pacientes que el usuario logeado puede ver
     private List<User> getPatientsForUser(User user) throws Exception {
-        // Lista final de pacientes
-        List<User> result = new ArrayList<>();
-        // Consulta todos los usuarios con rol de paciente
-        List<User> patients = userDao.getByField("role", "patient");
-        // Filtra según si es admin o médico
-        for (User patient : patients) {
+        List<User> all = userDao.getByField("role", "patient");
+        List<User> visible = new ArrayList<>();
+        for (User p : all) {
             if ("admin".equals(user.getRole())) {
-                result.add(patient);
-            } else if (user.getUid() != null && user.getUid().equals(patient.getAssignedDoctorId())) {
-                result.add(patient);
+                visible.add(p);
+            } else if (user.getUid() != null && user.getUid().equals(p.getAssignedDoctorId())) {
+                visible.add(p);
             }
         }
-        // Retorna la lista filtrada
-        return result;
+        return visible;
+    }
+
+    // Aplica el estilo blanco uniforme a los diálogos de este controlador
+    private void applyWhiteDialogStyle(DialogPane dp) {
+        dp.setStyle("-fx-background-color: #ffffff; -fx-font-size: 13px;");
+        javafx.scene.Node content = dp.lookup(".content.label");
+        if (content != null) content.setStyle("-fx-text-fill: #222222; -fx-font-size: 13px;");
+        javafx.scene.Node header = dp.lookup(".header-panel");
+        if (header != null) header.setStyle("-fx-background-color: #f5f5f5;");
+        javafx.scene.Node headerLabel = dp.lookup(".header-panel .label");
+        if (headerLabel != null) headerLabel.setStyle("-fx-text-fill: #111111; -fx-font-weight: bold;");
+        for (ButtonType bt : dp.getButtonTypes()) {
+            javafx.scene.Node node = dp.lookupButton(bt);
+            if (node instanceof Button) {
+                Button btn = (Button) node;
+                boolean cancel = (bt == ButtonType.CANCEL || bt == ButtonType.NO || bt == ButtonType.CLOSE);
+                btn.setStyle("-fx-background-color: " + (cancel ? "#9e9e9e" : "#2196f3") +
+                        "; -fx-text-fill: #ffffff; -fx-cursor: hand;" +
+                        " -fx-padding: 6 22; -fx-background-radius: 4;");
+            }
+        }
     }
 
     // Obtiene el historial de métricas de un paciente y lo ordena por fecha
     private List<Metric> getMetricsByPatientId(String patientId) throws Exception {
-        // Consulta todas las métricas del paciente
         List<Metric> metrics = metricDao.getByField("patientId", patientId);
-        // Ordena las métricas de más reciente a más antigua
         sortMetricsByTimestamp(metrics);
-        // Retorna la lista ordenada
         return metrics;
     }
 
-    // Ordena una lista de métricas por fecha de forma descendente
+    // Ordena una lista de métricas de más reciente a más antigua
     private void sortMetricsByTimestamp(List<Metric> metrics) {
-        Collections.sort(metrics, new Comparator<Metric>() {
-            @Override
-            public int compare(Metric first, Metric second) {
-                if (first.getTimestamp() == null && second.getTimestamp() == null) {
-                    return 0;
-                }
-                if (first.getTimestamp() == null) {
-                    return 1;
-                }
-                if (second.getTimestamp() == null) {
-                    return -1;
-                }
-                return second.getTimestamp().compareTo(first.getTimestamp());
-            }
+        metrics.sort((a, b) -> {
+            if (a.getTimestamp() == null && b.getTimestamp() == null) return 0;
+            if (a.getTimestamp() == null) return 1;
+            if (b.getTimestamp() == null) return -1;
+            return b.getTimestamp().compareTo(a.getTimestamp());
         });
     }
 }

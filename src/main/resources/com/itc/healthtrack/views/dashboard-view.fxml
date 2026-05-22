@@ -36,7 +36,7 @@
             <Button fx:id="btnPatientsList" maxWidth="Infinity" mnemonicParsing="false" onAction="#onShowPatientsList" styleClass="btn, btn-default" text="Lista de Pacientes" visible="true" managed="true" />
             <Button maxWidth="Infinity" mnemonicParsing="false" onAction="#onShowMetrics" styleClass="btn, btn-default" text="Métricas y Gráficos" />
             <Button maxWidth="Infinity" mnemonicParsing="false" onAction="#onShowReports" styleClass="btn, btn-default" text="Reportes Clínicos" />
-            <Button maxWidth="Infinity" mnemonicParsing="false" onAction="#onShowRecommendations" styleClass="btn, btn-default" text="Inteligencia Clínica" />
+            <Button maxWidth="Infinity" mnemonicParsing="false" onAction="#onShowRecommendations" styleClass="btn, btn-default" text="Recomendaciones" />
 
             <VBox alignment="BOTTOM_CENTER" VBox.vgrow="ALWAYS">
                 <Button maxWidth="Infinity" mnemonicParsing="false" onAction="#onLogout" styleClass="btn, btn-danger" text="Cerrar Sesión" />
@@ -46,7 +46,7 @@
 
     <center>
         <VBox fx:id="contentArea" alignment="CENTER" BorderPane.alignment="CENTER">
-            <Label text="Bienvenido al panel principal. Selecciona una opción del menú lateral." textFill="#7f8c8d" />
+            <Label text="Bienvenido al panel principaL, selecciona una opción del menú lateral." textFill="#7f8c8d" />
         </VBox>
     </center>
 </BorderPane>

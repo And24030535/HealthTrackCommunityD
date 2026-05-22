@@ -64,6 +64,14 @@
             <TextField fx:id="txtHeight" promptText="Ej: 1.75" GridPane.columnIndex="1" GridPane.rowIndex="8" styleClass="form-control"/>
         </GridPane>
 
+        <!-- Token section — visible only when Doctor or Admin role is selected -->
+        <VBox fx:id="tokenSection" spacing="6.0" visible="false" managed="false"
+              style="-fx-background-color: #1a2a1a; -fx-padding: 12; -fx-background-radius: 6; -fx-border-color: #ffcc00; -fx-border-width: 1; -fx-border-radius: 6;">
+            <Label fx:id="lblTokenLabel" text="Código de acceso *:" textFill="#ffcc00"
+                   style="-fx-font-size: 12px; -fx-font-weight: bold;"/>
+            <TextField fx:id="txtToken" promptText="Ingresa el código de acceso" styleClass="form-control"/>
+        </VBox>
+
         <Label fx:id="lblStatus" wrapText="true" visible="false">
             <font>
                 <Font name="System Bold" size="12.0" />

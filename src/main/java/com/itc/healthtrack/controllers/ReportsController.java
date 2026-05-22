@@ -2,6 +2,7 @@ package com.itc.healthtrack.controllers;
 
 import com.itc.healthtrack.dao.GenericDAO;
 import com.itc.healthtrack.models.Metric;
+import com.itc.healthtrack.models.Recommendation;
 import com.itc.healthtrack.models.User;
 import com.itextpdf.io.image.ImageData;
 import com.itextpdf.io.image.ImageDataFactory;
@@ -32,8 +33,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
 //Controlador encargado de exportar el historial clinico a formatos de reporte (PDF)
@@ -44,8 +43,10 @@ public class ReportsController {
     @FXML private Label lblStatus;               // Etiqueta para mensajes de estado/progreso
 
     // Acceso a datos
-    private final GenericDAO<User> userDao = new GenericDAO<>(User.class, "users");
-    private final GenericDAO<Metric> metricDao = new GenericDAO<>(Metric.class, "metrics");
+    private final GenericDAO<User>           userDao           = new GenericDAO<>(User.class, "users");
+    private final GenericDAO<Metric>         metricDao         = new GenericDAO<>(Metric.class, "metrics");
+    // Necesitamos las recomendaciones para incluirlas en el PDF
+    private final GenericDAO<Recommendation> recommendationDao = new GenericDAO<>(Recommendation.class, "recommendations");
     private User loggedInDoctor;
 
     /*Inicializa el controlador con los datos del usuario logeado
@@ -108,16 +109,22 @@ public class ReportsController {
                     // Descargar todo el historial del paciente
                     List<Metric> history = getMetricsByPatientId(selectedPatient.getUid());
 
+                    // Calculamos alertas y obtenemos la última recomendación
+                    // en este mismo hilo de fondo para no bloquear la interfaz
+                    String alertsText          = buildAlertsText(history);
+                    String recommendationText  = fetchLatestRecommendation(selectedPatient.getUid());
+
                     // Los snapshots de gráficos deben tomarse en el hilo FX
                     Platform.runLater(() -> {
                         try {
                             lblStatus.setText("Generando gráficos...");
                             List<byte[]> chartImages = buildChartImages(history);
 
-                            // Construir el archivo fisico en hilo secundario
+                            // Construir el archivo físico en hilo secundario
                             new Thread(() -> {
                                 try {
-                                    generatePDF(file.getAbsolutePath(), selectedPatient, history, chartImages);
+                                    generatePDF(file.getAbsolutePath(), selectedPatient, history,
+                                            chartImages, alertsText, recommendationText);
                                     Platform.runLater(() -> {
                                         lblStatus.setText("¡PDF guardado exitosamente en tu computadora!");
                                         lblStatus.setTextFill(javafx.scene.paint.Color.GREEN);
@@ -149,10 +156,11 @@ public class ReportsController {
         }
     }
 
-    /*Utiliza la libreria iText para dibujar los elementos dentro del PDF
-     Incluye una tabla con el historial y, si estan disponibles, graficos*/
+    /*Utiliza la libreria iText para construir el PDF completo.
+     Incluye: encabezado, tabla de métricas, gráficos, alertas detectadas y recomendaciones.*/
     private void generatePDF(String destPath, User patient, List<Metric> history,
-                              List<byte[]> chartImages) throws Exception {
+                              List<byte[]> chartImages,
+                              String alertsText, String recommendationText) throws Exception {
         // Inicializar el escritor de PDF
         PdfWriter writer = new PdfWriter(destPath);
         PdfDocument pdf = new PdfDocument(writer);
@@ -208,6 +216,22 @@ public class ReportsController {
                 document.add(new Paragraph(" "));
             }
         }
+
+        // ── Sección: Alertas Detectadas ─────────────────────────────────────
+        document.add(new Paragraph(" "));
+        document.add(new Paragraph("Alertas Detectadas")
+                .setBold().setFontSize(14));
+        document.add(new Paragraph(alertsText != null ? alertsText : "Sin alertas.")
+                .setFontSize(11));
+
+        // ── Sección: Recomendaciones Clínicas ───────────────────────────────
+        document.add(new Paragraph(" "));
+        document.add(new Paragraph("Recomendaciones Clínicas")
+                .setBold().setFontSize(14));
+        document.add(new Paragraph(recommendationText != null
+                ? recommendationText
+                : "No se ha generado ningún análisis para este paciente.")
+                .setFontSize(11));
 
         document.close();
     }
@@ -355,6 +379,13 @@ public class ReportsController {
                         lblStatus.setText("¡Excel guardado exitosamente en tu computadora!");
                         lblStatus.setTextFill(javafx.scene.paint.Color.GREEN);
                     });
+                } catch (java.io.FileNotFoundException e) {
+                    // Windows lanza FileNotFoundException cuando el archivo está abierto en Excel
+                    Platform.runLater(() -> {
+                        lblStatus.setText("Cierra el archivo en Excel y vuelve a intentarlo.");
+                        lblStatus.setTextFill(javafx.scene.paint.Color.RED);
+                    });
+                    e.printStackTrace();
                 } catch (Exception e) {
                     Platform.runLater(() -> {
                         lblStatus.setText("Error crítico al generar el Excel.");
@@ -431,50 +462,122 @@ public class ReportsController {
         workbook.close();
     }
 
-    // Obtiene la lista de pacientes visibles para el usuario logeado
-    private List<User> getPatientsForUser(User user) throws Exception {
-        // Lista final de pacientes
-        List<User> result = new ArrayList<>();
-        // Consulta todos los usuarios con rol de paciente
-        List<User> patients = userDao.getByField("role", "patient");
-        // Filtra según el rol del usuario actual
-        for (User patient : patients) {
-            if ("admin".equals(user.getRole())) {
-                result.add(patient);
-            } else if (user.getUid() != null && user.getUid().equals(patient.getAssignedDoctorId())) {
-                result.add(patient);
-            }
-        }
-        // Devuelve la lista filtrada
-        return result;
-    }
-
     // Obtiene el historial de métricas de un paciente y lo ordena por fecha
     private List<Metric> getMetricsByPatientId(String patientId) throws Exception {
-        // Consulta todas las métricas del paciente
         List<Metric> metrics = metricDao.getByField("patientId", patientId);
-        // Ordena las métricas de más reciente a más antigua
         sortMetricsByTimestamp(metrics);
-        // Devuelve la lista ordenada
         return metrics;
     }
 
-    // Ordena las métricas por fecha descendente
-    private void sortMetricsByTimestamp(List<Metric> metrics) {
-        Collections.sort(metrics, new Comparator<Metric>() {
-            @Override
-            public int compare(Metric first, Metric second) {
-                if (first.getTimestamp() == null && second.getTimestamp() == null) {
-                    return 0;
-                }
-                if (first.getTimestamp() == null) {
-                    return 1;
-                }
-                if (second.getTimestamp() == null) {
-                    return -1;
-                }
-                return second.getTimestamp().compareTo(first.getTimestamp());
+    private List<User> getPatientsForUser(User user) throws Exception {
+        List<User> all = userDao.getByField("role", "patient");
+        List<User> visible = new ArrayList<>();
+        for (User p : all) {
+            if ("admin".equals(user.getRole())) {
+                visible.add(p);
+            } else if (user.getUid() != null && user.getUid().equals(p.getAssignedDoctorId())) {
+                visible.add(p);
             }
+        }
+        return visible;
+    }
+
+    private void sortMetricsByTimestamp(List<Metric> metrics) {
+        metrics.sort((a, b) -> {
+            if (a.getTimestamp() == null && b.getTimestamp() == null) return 0;
+            if (a.getTimestamp() == null) return 1;
+            if (b.getTimestamp() == null) return -1;
+            return b.getTimestamp().compareTo(a.getTimestamp());
         });
+    }
+
+    // Analiza la métrica más reciente y devuelve un texto con todas las alertas clínicas detectadas.
+    // Usa los mismos umbrales que MetricsController para mantener consistencia.
+    private String buildAlertsText(List<Metric> history) {
+        if (history == null || history.isEmpty()) {
+            return "Sin métricas registradas — no se pueden calcular alertas.";
+        }
+
+        Metric latest = history.get(0); // La lista ya viene ordenada de más reciente a más antigua
+        StringBuilder sb = new StringBuilder();
+
+        // Evaluamos la presión arterial
+        if (latest.getSystolic() != null && latest.getDiastolic() != null) {
+            int sys = latest.getSystolic(), dia = latest.getDiastolic();
+            if (sys >= 180 || dia >= 120)
+                sb.append("• CRÍTICO: Hipertensión en crisis (")
+                  .append(sys).append("/").append(dia).append(" mmHg) — atención médica urgente.\n");
+            else if (sys >= 140 || dia >= 90)
+                sb.append("• ALERTA: Hipertensión arterial (")
+                  .append(sys).append("/").append(dia).append(" mmHg).\n");
+            else if (sys >= 120)
+                sb.append("• AVISO: Presión en rango prehipertensivo (")
+                  .append(sys).append("/").append(dia).append(" mmHg).\n");
+        }
+
+        // Evaluamos la glucosa
+        if (latest.getGlucoseLevel() != null) {
+            double g = latest.getGlucoseLevel();
+            if (g > 300)
+                sb.append("• CRÍTICO: Glucosa muy elevada (").append(g)
+                  .append(" mg/dL) — riesgo de cetoacidosis diabética.\n");
+            else if (g > 125)
+                sb.append("• ALERTA: Glucosa elevada (").append(g)
+                  .append(" mg/dL) — posible estado diabético.\n");
+            else if (g < 70)
+                sb.append("• ALERTA: Hipoglucemia (").append(g).append(" mg/dL).\n");
+        }
+
+        // Evaluamos la frecuencia cardíaca
+        if (latest.getHeartRate() != null) {
+            int hr = latest.getHeartRate();
+            if (hr > 120)
+                sb.append("• ALERTA: Taquicardia (").append(hr).append(" lpm).\n");
+            else if (hr < 50)
+                sb.append("• ALERTA: Bradicardia (").append(hr).append(" lpm).\n");
+        }
+
+        // Evaluamos el IMC
+        if (latest.getBmi() != null) {
+            double bmi = latest.getBmi();
+            if (bmi >= 40)
+                sb.append("• ALERTA: Obesidad mórbida (IMC ").append(bmi)
+                  .append(") — riesgo cardiovascular alto.\n");
+            else if (bmi >= 30)
+                sb.append("• AVISO: Obesidad (IMC ").append(bmi)
+                  .append(") — se recomienda plan nutricional.\n");
+            else if (bmi >= 25)
+                sb.append("• AVISO: Sobrepeso (IMC ").append(bmi)
+                  .append(") — incrementar actividad física.\n");
+        }
+
+        return sb.length() > 0
+                ? sb.toString().trim()
+                : "No se detectaron valores fuera del rango clínico normal.";
+    }
+
+    // Obtiene el análisis clínico más reciente guardado en Firestore para el paciente.
+    // Excluye las notas manuales del médico (type = "note") — solo trae análisis automáticos.
+    private String fetchLatestRecommendation(String patientId) {
+        try {
+            List<Recommendation> all = recommendationDao.getByField("patientId", patientId);
+            Recommendation latest = null;
+            for (Recommendation r : all) {
+                // Solo consideramos análisis automáticos, no notas del médico
+                if ("note".equals(r.getType())) continue;
+                if (latest == null) {
+                    latest = r;
+                } else if (r.getGeneratedAt() != null && latest.getGeneratedAt() != null
+                        && r.getGeneratedAt().compareTo(latest.getGeneratedAt()) > 0) {
+                    latest = r;
+                }
+            }
+            return (latest != null && latest.getMessage() != null)
+                    ? latest.getMessage()
+                    : "No se ha generado ningún análisis clínico para este paciente aún.";
+        } catch (Exception e) {
+            System.err.println("[ReportsController] Error al cargar recomendación: " + e.getMessage());
+            return "No disponible (error al conectar con la base de datos).";
+        }
     }
 }

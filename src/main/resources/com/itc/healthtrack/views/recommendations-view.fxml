@@ -10,7 +10,6 @@
     <Label text="Análisis y Recomendaciones Inteligentes" textFill="WHITE"
             style="-fx-font-size: 24px; -fx-font-weight: bold;"/>
 
-
     <HBox spacing="20.0" VBox.vgrow="ALWAYS">
 
         <!-- Left panel: patient selection + recommendation history -->
@@ -40,8 +39,14 @@
         <!-- Right panel: current diagnosis + tabbed external services -->
         <VBox spacing="15.0" HBox.hgrow="ALWAYS" styleClass="panel-secundario" style="-fx-padding: 20;">
 
-            <Label text="Diagnóstico y Alertas" textFill="WHITE"
-                    style="-fx-font-size: 20px; -fx-font-weight: bold;"/>
+            <!-- Encabezado con botón de exportación a Excel -->
+            <HBox alignment="CENTER_LEFT" spacing="15.0">
+                <Label text="Diagnóstico y Alertas" textFill="WHITE"
+                        style="-fx-font-size: 20px; -fx-font-weight: bold;"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Button text="⬇ Exportar Excel" onAction="#onExportExcel"
+                        styleClass="btn-success" prefHeight="35.0" prefWidth="150.0"/>
+            </HBox>
             <TextArea fx:id="txtRecommendations" editable="false" wrapText="true" VBox.vgrow="ALWAYS"
                       style="-fx-font-size: 14px; -fx-text-fill: #e0e0e0;
                              -fx-control-inner-background: #2c2c2c;" />
@@ -51,9 +56,8 @@
             <Label text="Servicios Web Externos" textFill="WHITE"
                     style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
 
-            <!-- TabPane with FDA and Nutritional API tabs -->
-            <TabPane VBox.vgrow="ALWAYS" tabClosingPolicy="UNAVAILABLE"
-                     style="-fx-background-color: transparent;">
+            <!-- TabPane con FDA y USDA — el estilo viene de main.css (.tab-pane) -->
+            <TabPane VBox.vgrow="ALWAYS" tabClosingPolicy="UNAVAILABLE">
                 <Tab text="FDA (Medicamentos)">
                     <TextArea fx:id="txtWebService" editable="false" wrapText="true"
                               style="-fx-font-family: monospace;
@@ -70,4 +74,34 @@
 
         </VBox>
     </HBox>
+
+    <VBox fx:id="notesSection" spacing="5.0" VBox.vgrow="ALWAYS"
+          styleClass="panel-secundario" style="-fx-padding: 15; -fx-background-color: #1a1a1a;">
+
+        <Label text="Notas Médicas" textFill="WHITE"
+               style="-fx-font-size: 16px; -fx-font-weight: bold;"/>
+
+        <HBox spacing="15.0" VBox.vgrow="ALWAYS" minHeight="200.0">
+
+            <VBox fx:id="noteWriteSection" spacing="5.0" prefWidth="300.0"
+                  visible="false" managed="false" VBox.vgrow="ALWAYS">
+                <TextArea fx:id="txtNoteInput" wrapText="true" VBox.vgrow="ALWAYS"
+                          promptText="Escribir nota..."
+                          style="-fx-control-inner-background: #2c2c2c; -fx-text-fill: #e0e0e0;" />
+                <Button text="Guardar Nota" onAction="#onSaveDoctorNote"
+                        styleClass="btn-primary" maxWidth="Infinity" prefHeight="35.0"/>
+            </VBox>
+
+            <VBox spacing="5.0" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
+                <ScrollPane fx:id="scrollNotes" fitToWidth="true" VBox.vgrow="ALWAYS"
+                            style="-fx-background: transparent; -fx-background-color: transparent;">
+                    <content>
+                        <VBox fx:id="vboxNotesList" spacing="10.0"
+                              style="-fx-background-color: #111827; -fx-padding: 10;" />
+                    </content>
+                </ScrollPane>
+            </VBox>
+        </HBox>
+    </VBox>
+
 </VBox>

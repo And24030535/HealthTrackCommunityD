@@ -35,16 +35,14 @@
 
             <Label text="Altura (m):" GridPane.columnIndex="0" GridPane.rowIndex="5"/>
             <TextField fx:id="txtHeight" GridPane.columnIndex="1" GridPane.rowIndex="5" styleClass="form-control"/>
-
-            <Label text="Contraseña:" GridPane.columnIndex="0" GridPane.rowIndex="6"/>
-            <PasswordField fx:id="txtPassword" promptText="Contraseña de acceso" GridPane.columnIndex="1" GridPane.rowIndex="6" styleClass="form-control"/>
         </GridPane>
 
         <HBox spacing="10.0" alignment="CENTER">
-            <Button text="Guardar" onAction="#onSavePatient" styleClass="btn, btn-primary" prefWidth="100.0"/>
-            <Button text="Eliminar" onAction="#onDeletePatient" styleClass="btn, btn-danger" prefWidth="100.0"/>
-            <Button text="Limpiar" onAction="#onClearForm" styleClass="btn, btn-default" prefWidth="100.0"/>
+            <Button text="Guardar"  onAction="#onSavePatient"  styleClass="btn, btn-primary" prefWidth="100.0"/>
+            <Button text="Eliminar" onAction="#onDeletePatient" styleClass="btn, btn-danger"  prefWidth="100.0"/>
+            <Button text="Limpiar"  onAction="#onClearForm"    styleClass="btn, btn-default" prefWidth="100.0"/>
         </HBox>
+
     </VBox>
 
     <VBox spacing="10.0" HBox.hgrow="ALWAYS">
@@ -56,10 +54,10 @@
 
         <TableView fx:id="tablePatients" VBox.vgrow="ALWAYS">
             <columns>
-                <TableColumn fx:id="colFirstName" text="Nombre" prefWidth="120"/>
-                <TableColumn fx:id="colLastName" text="Apellido" prefWidth="120"/>
-                <TableColumn fx:id="colEmail" text="Correo Electrónico" prefWidth="150"/>
-                <TableColumn fx:id="colGender" text="Género" prefWidth="80"/>
+                <TableColumn fx:id="colFirstName" text="Nombre"             prefWidth="120"/>
+                <TableColumn fx:id="colLastName"  text="Apellido"           prefWidth="120"/>
+                <TableColumn fx:id="colEmail"     text="Correo Electrónico" prefWidth="150"/>
+                <TableColumn fx:id="colGender"    text="Género"             prefWidth="80"/>
             </columns>
             <columnResizePolicy>
                 <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />

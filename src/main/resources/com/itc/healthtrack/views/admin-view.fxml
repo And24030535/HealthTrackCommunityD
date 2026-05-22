@@ -65,6 +65,8 @@
                     style="-fx-background-color: #9c27b0; -fx-text-fill: white; -fx-cursor: hand; -fx-padding: 6 14;" />
             <Button text="Cambiar Rol" onAction="#onChangeRole"
                     style="-fx-background-color: #ff9800; -fx-text-fill: white; -fx-cursor: hand; -fx-padding: 6 14;" />
+            <Button text="Asignar Médico" onAction="#onAssignDoctor"
+                    style="-fx-background-color: #4caf50; -fx-text-fill: white; -fx-cursor: hand; -fx-padding: 6 14;" />
         </HBox>
 
         <TableView fx:id="tableUsers" VBox.vgrow="ALWAYS">

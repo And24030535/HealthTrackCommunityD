@@ -73,7 +73,7 @@
         <TableView fx:id="tableMetrics" prefHeight="180.0" VBox.vgrow="ALWAYS">
             <columns>
                 <TableColumn fx:id="colDate" text="Fecha y Hora" prefWidth="160"/>
-                <TableColumn fx:id="colSysDia" text="PA (Sis/Dia)" prefWidth="100"/>
+                <TableColumn fx:id="colSysDia" text="Presión (Sis/Dia)" prefWidth="100"/>
                 <TableColumn fx:id="colHeartRate" text="F. Cardíaca" prefWidth="70"/>
                 <TableColumn fx:id="colGlucose" text="Glucosa" prefWidth="80"/>
                 <TableColumn fx:id="colWeight" text="Peso" prefWidth="80"/>
@@ -92,7 +92,7 @@
             </yAxis>
         </LineChart>
 
-        <BarChart fx:id="averagesChart" title="Comparativa de Promedios del Período" prefHeight="200.0" VBox.vgrow="ALWAYS">
+        <BarChart fx:id="averagesChart" title="Promedios del Período" prefHeight="200.0" VBox.vgrow="ALWAYS">
             <xAxis>
                 <CategoryAxis label="Métrica" side="BOTTOM" animated="false" />
             </xAxis>

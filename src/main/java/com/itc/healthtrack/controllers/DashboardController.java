@@ -18,7 +18,7 @@ import java.io.IOException;
  Adapta los módulos disponibles según el rol del usuario logeado*/
 public class DashboardController {
 
-    // Elementos deinterfaz
+    // Elementos de interfaz
     @FXML private Label userNameLabel;
     @FXML private Label roleLabel;          // Etiqueta con el rol del usuario
     @FXML private VBox contentArea;         // Área central donde se cargan los módulos
@@ -32,7 +32,6 @@ public class DashboardController {
      Ajusta la interfaz según el rol del usuario */
     public void initData(User user) {
         this.loggedInUser = user;
-        System.out.println("ROL DEL USUARIO: " + user.getRole());
 
         // Muestra el prefijo correcto según el rol
         String role = user.getRole() != null ? user.getRole() : "patient";
@@ -145,7 +144,7 @@ public class DashboardController {
     protected void onLogout(ActionEvent event) {
         try {
             FXMLLoader fxmlLoader = new FXMLLoader(getClass().getResource("/com/itc/healthtrack/views/login-view.fxml"));
-            Scene loginScene = new Scene(fxmlLoader.load(), 800, 600);
+            Scene loginScene = new Scene(fxmlLoader.load(), 960, 620);
 
             loginScene.getStylesheets().add(BootstrapFX.bootstrapFXStylesheet());
             String cssPath = getClass().getResource("/css/main.css").toExternalForm();
@@ -153,7 +152,9 @@ public class DashboardController {
 
             Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
             stage.setScene(loginScene);
-            stage.centerOnScreen();
+            // Mantener pantalla completa al volver al login
+            stage.setFullScreen(true);
+            stage.setFullScreenExitKeyCombination(javafx.scene.input.KeyCombination.NO_MATCH);
         } catch (IOException e) {
             e.printStackTrace();
         }

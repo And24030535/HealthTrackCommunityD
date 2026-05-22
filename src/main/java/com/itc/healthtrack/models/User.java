@@ -1,33 +1,58 @@
 package com.itc.healthtrack.models;
 
-import java.util.List;
-
 /**
  * Representa a un usuario dentro del sistema HealthTrack.
+ *
+ * NOTA DE SEGURIDAD: El campo "password" fue eliminado intencionalmente.
+ * Las contraseñas son gestionadas de forma segura por Firebase Authentication
+ * y NUNCA deben almacenarse en Firestore. El identificador único (uid) que
+ * vincula este perfil con Firebase Auth se guarda en el campo "uid".
+ *
  * Atributos en inglés y comentarios en español como se solicitó.
  */
 public class User {
-    private String uid;               // Identificador único
-    private String email;             // Correo institucional
-    private String firstName;         // Nombre
-    private String lastName;          // Apellidos
-    private String role;              // "patient", "doctor" o "admin"
-    private String password;          // Contraseña
 
+    // Identificador único del usuario — corresponde al UID generado por Firebase Auth
+    private String uid;
+
+    // Correo electrónico del usuario, también usado como identificador en Firebase Auth
+    private String email;
+
+    // Nombre del usuario
+    private String firstName;
+
+    // Apellido(s) del usuario
+    private String lastName;
+
+    // Rol dentro del sistema: "patient", "doctor" o "admin"
+    private String role;
+
+    // -------------------------------------------------------------------
     // Campos exclusivos para pacientes
-    private String birthDate;         // Fecha de nacimiento (String para simplicidad en FXML)
-    private String gender;            // "M" o "F"
-    private Double height;            // Estatura en metros
-    private String assignedDoctorId;  // UID del médico a cargo
-    private String assignedDoctorName; // Nombre del médico asignado
+    // -------------------------------------------------------------------
 
-    // Campos exclusivos para médicos
-    private List<String> patientIds;  // Lista de pacientes a cargo
+    // Fecha de nacimiento almacenada como texto para simplicidad en FXML (ej: "2000-01-15")
+    private String birthDate;
 
-    // Constructor vacío requerido por Firestore
+    // Género del paciente: "M", "F" u "Otro"
+    private String gender;
+
+    // Estatura del paciente en metros (ej: 1.75)
+    private Double height;
+
+    // UID del médico asignado a este paciente
+    private String assignedDoctorId;
+
+    // Nombre completo del médico asignado (desnormalizado para mostrar en UI sin consulta extra)
+    private String assignedDoctorName;
+
+    // Constructor vacío requerido por Firestore para deserializar documentos automáticamente
     public User() {}
 
+    // -------------------------------------------------------------------
     // Getters y Setters
+    // -------------------------------------------------------------------
+
     public String getUid() { return uid; }
     public void setUid(String uid) { this.uid = uid; }
 
@@ -58,11 +83,14 @@ public class User {
     public String getAssignedDoctorName() { return assignedDoctorName; }
     public void setAssignedDoctorName(String assignedDoctorName) { this.assignedDoctorName = assignedDoctorName; }
 
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
+    // BeanMapper construye su mapa de propiedades a partir de los GETTERS.
+    // Sin getter, el setter correspondiente es ignorado y el warning persiste.
+    // Solución: agregar ambos. El getter devuelve null para no escribir datos obsoletos en Firestore.
+    public String getPassword() { return null; }
+    public void   setPassword(String password) {} // no-op: contraseña vive en Firebase Auth, no en Firestore
 
-    public List<String> getPatientIds() { return patientIds; }
-    public void setPatientIds(List<String> patientIds) { this.patientIds = patientIds; }
+    public java.util.List<String> getPatientIds() { return null; }
+    public void setPatientIds(java.util.List<String> patientIds) {} // no-op: campo obsoleto
 
     @Override
     public String toString() {

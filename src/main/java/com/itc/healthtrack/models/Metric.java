@@ -7,8 +7,6 @@ public class Metric {
     private String id;
     private String patientId;
     private Timestamp timestamp;
-    private String metricType;
-    private String notes;
     private Integer systolic;
     private Integer diastolic;
     private Integer heartRate;
@@ -30,12 +28,6 @@ public class Metric {
     public Timestamp getTimestamp() { return timestamp; }
     public void setTimestamp(Timestamp timestamp) { this.timestamp = timestamp; }
 
-    public String getMetricType() { return metricType; }
-    public void setMetricType(String metricType) { this.metricType = metricType; }
-
-    public String getNotes() { return notes; }
-    public void setNotes(String notes) { this.notes = notes; }
-
     public Integer getSystolic() { return systolic; }
     public void setSystolic(Integer systolic) { this.systolic = systolic; }
 
@@ -53,4 +45,11 @@ public class Metric {
 
     public Double getGlucoseLevel() { return glucoseLevel; }
     public void setGlucoseLevel(Double glucoseLevel) { this.glucoseLevel = glucoseLevel; }
+
+    // Igual que en User — BeanMapper necesita getter+setter para registrar la propiedad.
+    public String getMetricType() { return null; }
+    public void   setMetricType(String metricType) {} // no-op: campo eliminado del modelo
+
+    public String getNotes() { return null; }
+    public void   setNotes(String notes) {} // no-op: campo eliminado del modelo
 }

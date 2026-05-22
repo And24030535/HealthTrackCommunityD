@@ -1,5 +1,7 @@
 package com.itc.healthtrack.controllers;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.UserRecord;
 import com.itc.healthtrack.dao.GenericDAO;
 import com.itc.healthtrack.models.User;
 import javafx.application.Platform;
@@ -9,186 +11,342 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import org.kordamp.bootstrapfx.BootstrapFX;
 
 import java.util.List;
 
-/*Controlador que gestiona el registro de nuevos usuarios
- Valida los datos, guarda en Firestore y asigna un doctor automáticamente para pacientes*/
+/**
+ * Controlador de registro de nuevos usuarios.
+ *
+ * ROLES Y TOKENS DE SEGURIDAD:
+ *   Paciente  → sin token requerido (registro libre).
+ *   Doctor    → debe ingresar TOKEN_DOCTOR para validar acceso médico.
+ *   Admin     → debe ingresar TOKEN_ADMIN  (código maestro de administrador).
+ *   Token incorrecto o vacío → se muestra alerta y se bloquea el registro.
+ *
+ * FLUJO:
+ *   1. Usuario selecciona rol — el campo de token aparece dinámicamente para
+ *      roles elevados (Doctor / Admin).
+ *   2. Se validan los campos y el token en el hilo de la UI.
+ *   3. Se crea la cuenta en Firebase Auth (Admin SDK).
+ *   4. Se guarda el perfil completo (con rol) en Firestore, SIN contraseña.
+ */
 public class RegisterController {
 
-    // Elementos de formulario
-    @FXML private TextField txtFirstName;           // Campo: Nombre
-    @FXML private TextField txtLastName;            // Campo: Apellido
-    @FXML private TextField txtEmail;               // Campo: Email
-    @FXML private TextField txtHeight;              // Campo: Estatura
-    @FXML private DatePicker dpBirthDate;           // Campo: Fecha de nacimiento
-    @FXML private PasswordField txtPassword;         // Campo: Contraseña
-    @FXML private PasswordField txtConfirmPassword;  // Campo: Confirmar contraseña
-    @FXML private ComboBox<String> comboGender;     // ComboBox: Género
-    @FXML private ComboBox<String> comboRole;       // ComboBox: Rol (Paciente/Doctor)
-    @FXML private Label lblStatus;                  // Etiqueta de estado/errores
-    @FXML private Button btnRegister;               // Botón de registro
+    // -------------------------------------------------------------------
+    // Tokens de seguridad  (en producción vendrían de un backend seguro)
+    // -------------------------------------------------------------------
+    private static final String TOKEN_DOCTOR = "DOCTOR-2026";
+    private static final String TOKEN_ADMIN  = "ADMIN-TRACK-2026";
 
-    // Acdeso a datos
-    private final GenericDAO<User> userDao = new GenericDAO<>(User.class, "users");
+    // -------------------------------------------------------------------
+    // Campos del formulario — deben coincidir con fx:id en register-view.fxml
+    // -------------------------------------------------------------------
+    @FXML private TextField        txtFirstName;
+    @FXML private TextField        txtLastName;
+    @FXML private TextField        txtEmail;
+    @FXML private TextField        txtHeight;
+    @FXML private DatePicker       dpBirthDate;
+    @FXML private PasswordField    txtPassword;
+    @FXML private PasswordField    txtConfirmPassword;
+    @FXML private ComboBox<String> comboGender;    // M / F / Otro
+    @FXML private ComboBox<String> comboRole;      // Paciente / Doctor / Admin
 
-    // Inicializa los ComboBox con opciones de género y rol
+    // Sección de token — visible dinámicamente para Doctor / Admin
+    @FXML private VBox      tokenSection;
+    @FXML private Label     lblTokenLabel;
+    @FXML private TextField txtToken;
+
+    @FXML private Label  lblStatus;
+    @FXML private Button btnRegister;
+
+    // Único DAO necesario: GenericDAO apuntando a la colección "users"
+    private final GenericDAO<User> userDAO = new GenericDAO<>(User.class, "users");
+
+    // -------------------------------------------------------------------
+    // Inicialización
+    // -------------------------------------------------------------------
+
     @FXML
     public void initialize() {
         comboGender.getItems().addAll("M", "F", "Otro");
-        comboRole.getItems().addAll("Paciente", "Doctor");
-        comboRole.getSelectionModel().selectFirst();
+        comboRole.getItems().addAll("Paciente", "Doctor", "Admin");
+        comboRole.setValue("Paciente");
+
+        // Mostrar / ocultar el campo de token según el rol seleccionado
+        comboRole.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            boolean needsToken = "Doctor".equals(newVal) || "Admin".equals(newVal);
+            tokenSection.setVisible(needsToken);
+            tokenSection.setManaged(needsToken);
+
+            if (!needsToken) {
+                txtToken.clear();
+            } else {
+                lblTokenLabel.setText("Doctor".equals(newVal)
+                        ? "Código de acceso médico:"
+                        : "Código de acceso administrador:");
+            }
+        });
     }
 
-    /*Procesa el registro de un nuevo usuario.
-     Valida todos los campos, guarda el usuario en Firestore y asigna un doctor automáticamente si es paciente*/
+    // -------------------------------------------------------------------
+    // Registro
+    // -------------------------------------------------------------------
+
     @FXML
     protected void onRegister(ActionEvent event) {
-        String firstName = txtFirstName.getText().trim();
-        String lastName = txtLastName.getText().trim();
-        String email = txtEmail.getText().trim();
-        String password = txtPassword.getText();
-        String confirmPassword = txtConfirmPassword.getText();
-        String role = comboRole.getValue();
 
-        // Mapear roles en español a inglés para consistencia con el sistema
-        final String mappedRole;
-        if ("Paciente".equals(role)) {
-            mappedRole = "patient";
-        } else if ("Doctor".equals(role)) {
-            mappedRole = "doctor";
-        } else if ("Admin".equals(role)) {
-            mappedRole = "admin";
-        } else {
-            mappedRole = "patient"; // por defecto: paciente
-        }
+        // ── Leer TODOS los valores de la UI en el hilo FX antes del hilo de fondo ──
+        final String firstName    = txtFirstName.getText().trim();
+        final String lastName     = txtLastName.getText().trim();
+        final String email        = txtEmail.getText().trim();
+        final String password     = txtPassword.getText();
+        final String confirmPass  = txtConfirmPassword.getText();
+        final String gender       = comboGender.getValue();
+        final String roleLabel    = comboRole.getValue();
+        final String tokenInput   = txtToken.getText().trim();
+        final String heightText   = txtHeight.getText().trim();
+        final String birthDateStr = dpBirthDate.getValue() != null
+                ? dpBirthDate.getValue().toString() : null;
 
-        // Validaciones básicas
+        // ── Validaciones básicas ───────────────────────────────────────────
         if (firstName.isEmpty() || lastName.isEmpty() || email.isEmpty() || password.isEmpty()) {
-            showStatus("Por favor, completa todos los campos obligatorios", false);
+            showStatus("Por favor, completa todos los campos obligatorios.", false);
             return;
         }
-
-        if (!password.equals(confirmPassword)) {
-            showStatus("Las contraseñas no coinciden", false);
+        if (!password.equals(confirmPass)) {
+            showStatus("Las contraseñas no coinciden.", false);
             return;
         }
-
         if (password.length() < 6) {
-            showStatus("La contraseña debe tener al menos 6 caracteres", false);
+            showStatus("La contraseña debe tener al menos 6 caracteres.", false);
             return;
         }
+        if (roleLabel == null || roleLabel.isEmpty()) {
+            showStatus("Por favor, selecciona un rol.", false);
+            return;
+        }
+
+        // ── Validación de token para roles elevados ────────────────────────
+        if ("Doctor".equals(roleLabel)) {
+            if (tokenInput.isEmpty()) {
+                showTokenAlert("Se requiere el código de acceso médico para registrarse como Doctor.\n"
+                        + "Solicítalo al administrador del sistema.");
+                return;
+            }
+            if (!TOKEN_DOCTOR.equals(tokenInput)) {
+                showTokenAlert("Código de acceso médico incorrecto.\n"
+                        + "Verifica el código e intenta de nuevo.");
+                return;
+            }
+        } else if ("Admin".equals(roleLabel)) {
+            if (tokenInput.isEmpty()) {
+                showTokenAlert("Se requiere el código maestro de administrador.\n"
+                        + "Solicítalo al administrador principal del sistema.");
+                return;
+            }
+            if (!TOKEN_ADMIN.equals(tokenInput)) {
+                showTokenAlert("Código maestro de administrador incorrecto.\n"
+                        + "Verifica el código e intenta de nuevo.");
+                return;
+            }
+        }
+
+        // ── Mapear etiqueta de rol a valor interno ────────────────────────
+        final String mappedRole;
+        switch (roleLabel) {
+            case "Doctor": mappedRole = "doctor"; break;
+            case "Admin":  mappedRole = "admin";  break;
+            default:       mappedRole = "patient"; break;
+        }
+
+        // ── Validar formato de altura ──────────────────────────────────────
+        Double parsedHeight = null;
+        if (!heightText.isEmpty()) {
+            try {
+                parsedHeight = Double.parseDouble(heightText);
+            } catch (NumberFormatException e) {
+                showStatus("Altura inválida. Usa un número decimal (ej: 1.75).", false);
+                return;
+            }
+        }
+        final Double finalHeight = parsedHeight;
 
         btnRegister.setDisable(true);
 
         new Thread(() -> {
             try {
-                // Crear nuevo usuario
-                User newUser = new User();
-                newUser.setFirstName(firstName);
-                newUser.setLastName(lastName);
-                newUser.setEmail(email);
-                newUser.setPassword(password);
-                newUser.setRole(mappedRole);
-                newUser.setGender(comboGender.getValue());
 
-                if (dpBirthDate.getValue() != null) {
-                    newUser.setBirthDate(dpBirthDate.getValue().toString());
-                }
+                // PASO 1 — Crear cuenta en Firebase Auth (Admin SDK)
+                UserRecord.CreateRequest authRequest = new UserRecord.CreateRequest()
+                        .setEmail(email)
+                        .setPassword(password);
+                UserRecord createdRecord = FirebaseAuth.getInstance().createUser(authRequest);
+                String uid = createdRecord.getUid();
+                System.out.println("[RegisterController] Auth OK — UID: " + uid);
 
-                // Validar y parsear la altura
-                String heightText = txtHeight.getText().trim();
-                if (!heightText.isEmpty()) {
-                    try {
-                        newUser.setHeight(Double.parseDouble(heightText));
-                    } catch (NumberFormatException e) {
-                        Platform.runLater(() -> {
-                            showStatus("Altura inválida.\n Verifica que sea un número decimal (ej: 1.75).", false);
-                            btnRegister.setDisable(false);
-                        });
-                        return;
-                    }
-                }
+                // PASO 2 — Construir perfil para Firestore (sin contraseña)
+                User profile = new User();
+                profile.setUid(uid);
+                profile.setEmail(email);
+                profile.setFirstName(firstName);
+                profile.setLastName(lastName);
+                profile.setRole(mappedRole);        // rol validado por token
+                profile.setGender(gender);
+                if (birthDateStr != null) profile.setBirthDate(birthDateStr);
+                if (finalHeight  != null) profile.setHeight(finalHeight);
 
-                // Genera un ID nuevo para el usuario y lo asigna al modelo
-                String newId = userDao.createDocumentId();
-                newUser.setUid(newId);
-                // Selecciona un doctor si el nuevo usuario es paciente
+                // PASO 3 — Auto-asignar médico si el nuevo usuario es paciente
                 if ("patient".equals(mappedRole)) {
-                    // Busca todos los doctores disponibles
-                    List<User> doctors = getDoctors();
+                    List<User> doctors = userDAO.getByField("role", "doctor");
                     if (!doctors.isEmpty()) {
-                        // Selecciona un doctor al azar para asignarlo al paciente
-                        User randomDoctor = doctors.get((int) (Math.random() * doctors.size()));
-                        newUser.setAssignedDoctorId(randomDoctor.getUid());
-                        System.out.println("Paciente registrado y asignado al doctor: " + randomDoctor.getFirstName() + " " + randomDoctor.getLastName());
-                    } else {
-                        System.out.println("Paciente registrado pero no hay doctores disponibles para asignar");
+                        User assigned = doctors.get((int) (Math.random() * doctors.size()));
+                        profile.setAssignedDoctorId(assigned.getUid());
+                        System.out.println("[RegisterController] Doctor asignado: "
+                                + assigned.getFirstName() + " " + assigned.getLastName());
                     }
                 }
-                // Guarda el usuario completo en Firestore con el ID generado
-                userDao.save(newId, newUser);
 
+                // PASO 4 — Guardar perfil en Firestore usando el UID como ID del documento
+                userDAO.save(uid, profile);
+                System.out.println("[RegisterController] Perfil guardado en Firestore — UID: " + uid
+                        + ", rol: " + mappedRole);
+
+                // Éxito — mostrar confirmación y redirigir al login
                 Platform.runLater(() -> {
-                    showStatus("¡Cuenta creada exitosamente! \nRedirigiendo al login...", true);
+                    String displayRole = "doctor".equals(mappedRole) ? "Doctor"
+                                       : "admin".equals(mappedRole)  ? "Administrador"
+                                       : "Paciente";
+                    showStatus("¡Cuenta creada como " + displayRole + "! Redirigiendo al login...", true);
                     btnRegister.setDisable(false);
                     new Thread(() -> {
-                        try { Thread.sleep(1500); } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        }
+                        try { Thread.sleep(1500); }
+                        catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
                         Platform.runLater(() -> goToLogin(event));
                     }).start();
                 });
 
-            } catch (Exception e) {
+            } catch (com.google.firebase.auth.FirebaseAuthException authEx) {
+                String errorCode = resolveAuthErrorCode(authEx);
+                System.err.println("[RegisterController] FirebaseAuthException — código: " + errorCode);
+                authEx.printStackTrace();
+                final String msg = parseAuthError(errorCode);
                 Platform.runLater(() -> {
-                    showStatus("Error al crear la cuenta, intenta de nuevo", false);
+                    showStatus(msg, false);
                     btnRegister.setDisable(false);
                 });
-                e.printStackTrace();
+
+            } catch (Exception ex) {
+                System.err.println("[RegisterController] Error inesperado: "
+                        + ex.getClass().getSimpleName() + " — " + ex.getMessage());
+                ex.printStackTrace();
+                Platform.runLater(() -> {
+                    showStatus("Error al crear la cuenta: " + ex.getMessage(), false);
+                    btnRegister.setDisable(false);
+                });
             }
         }).start();
     }
 
-    /*Navega a la pantalla de inicio de sesión
-     Se llama cuando el usuario hace clic en "Ir a Login" */
+    // -------------------------------------------------------------------
+    // Alerta de token inválido — dialog blanco para consistencia visual
+    // -------------------------------------------------------------------
+
+    private void showTokenAlert(String message) {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setTitle("Código de Acceso Requerido");
+        alert.setHeaderText("Verificación de seguridad fallida");
+        alert.setContentText(message);
+
+        DialogPane dp = alert.getDialogPane();
+        dp.setStyle("-fx-background-color: #ffffff; -fx-font-size: 13px;");
+        javafx.scene.Node content = dp.lookup(".content.label");
+        if (content != null) content.setStyle("-fx-text-fill: #222222;");
+        javafx.scene.Node header = dp.lookup(".header-panel");
+        if (header != null) header.setStyle("-fx-background-color: #fff3e0;");
+        javafx.scene.Node headerLabel = dp.lookup(".header-panel .label");
+        if (headerLabel != null) headerLabel.setStyle("-fx-text-fill: #e65100; -fx-font-weight: bold;");
+        for (ButtonType bt : dp.getButtonTypes()) {
+            javafx.scene.Node node = dp.lookupButton(bt);
+            if (node instanceof Button) {
+                ((Button) node).setStyle(
+                        "-fx-background-color: #ff9800; -fx-text-fill: #ffffff;"
+                        + " -fx-cursor: hand; -fx-padding: 6 22; -fx-background-radius: 4;");
+            }
+        }
+        alert.showAndWait();
+    }
+
+    // -------------------------------------------------------------------
+    // Helpers de Firebase Auth
+    // -------------------------------------------------------------------
+
+    /**
+     * Extrae el código de error con compatibilidad entre versiones del SDK.
+     * Firebase Admin SDK 9+ usa getAuthErrorCode(); versiones anteriores, getErrorCode().
+     */
+    private String resolveAuthErrorCode(com.google.firebase.auth.FirebaseAuthException ex) {
+        try { if (ex.getAuthErrorCode() != null) return ex.getAuthErrorCode().name(); }
+        catch (Exception ignored) {}
+        try { if (ex.getErrorCode()     != null) return ex.getErrorCode().name();     }
+        catch (Exception ignored) {}
+        return ex.getMessage() != null ? ex.getMessage() : "UNKNOWN";
+    }
+
+    /** Traduce códigos de Firebase Auth a mensajes en español. */
+    private String parseAuthError(String code) {
+        if (code == null) return "Error al registrar la cuenta. Intenta de nuevo.";
+        switch (code) {
+            case "EMAIL_ALREADY_EXISTS":
+            case "DUPLICATE_EMAIL":
+                return "Este correo ya está registrado. Inicia sesión o usa otro correo.";
+            case "INVALID_EMAIL":
+                return "El formato del correo no es válido.";
+            case "WEAK_PASSWORD":
+                return "Contraseña débil. Usa al menos 6 caracteres variados.";
+            default:
+                System.err.println("[RegisterController] Código Firebase no reconocido: " + code);
+                return "Error al registrar (" + code + "). Verifica los datos e intenta de nuevo.";
+        }
+    }
+
+    // -------------------------------------------------------------------
+    // Navegación
+    // -------------------------------------------------------------------
+
     @FXML
     protected void onGoToLogin(ActionEvent event) {
         goToLogin(event);
     }
 
-    //Carga la pantalla de login aplicando los estilos CSS
     private void goToLogin(ActionEvent event) {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/com/itc/healthtrack/views/login-view.fxml"));
-            Scene scene = new Scene(loader.load(), 800, 600);
+            FXMLLoader loader = new FXMLLoader(
+                    getClass().getResource("/com/itc/healthtrack/views/login-view.fxml"));
+            Scene scene = new Scene(loader.load(), 960, 620);
             scene.getStylesheets().add(BootstrapFX.bootstrapFXStylesheet());
-            String cssPath = getClass().getResource("/css/main.css").toExternalForm();
-            scene.getStylesheets().add(cssPath);
+            scene.getStylesheets().add(getClass().getResource("/css/main.css").toExternalForm());
             Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
             stage.setScene(scene);
-            stage.centerOnScreen();
+            // Mantener pantalla completa al volver al login
+            stage.setFullScreen(true);
+            stage.setFullScreenExitKeyCombination(javafx.scene.input.KeyCombination.NO_MATCH);
         } catch (Exception e) {
             e.printStackTrace();
+            showStatus("Error al volver al login.", false);
         }
     }
 
-    /*Muestra un mensaje de estado en la interfaz.
-     Cambia el color según si es un éxito (verde) o un error (rojo)*/
+    // -------------------------------------------------------------------
+    // UI helper
+    // -------------------------------------------------------------------
+
     private void showStatus(String message, boolean isSuccess) {
         lblStatus.setText(message);
         lblStatus.setTextFill(isSuccess ? Color.web("#4caf50") : Color.web("#ff5252"));
         lblStatus.setVisible(true);
-    }
-
-    // Obtiene todos los usuarios con rol de doctor usando un filtro simple
-    private List<User> getDoctors() throws Exception {
-        // Consulta todos los usuarios que tengan rol de doctor
-        List<User> doctors = userDao.getByField("role", "doctor");
-        // Retorna la lista de doctores encontrados
-        return doctors;
     }
 }
