@@ -38,18 +38,6 @@ import java.util.List;
  *    - Requiere correo, contraseña y token de acceso médico.
  *    - Solo acepta rol "doctor" con token correcto.
  *
- *  CORRECCIÓN TAREA 1 — Bug "Error desconocido":
- *    Causa raíz: el cuerpo JSON se construía concatenando strings sin escapar
- *    caracteres especiales (p.ej. una contraseña con `"` o `\` generaba JSON
- *    malformado). Firebase devolvía entonces un error en formato inesperado y
- *    el extractor de texto fallaba, resultando en errorCode = null → mensaje
- *    "Error desconocido al iniciar sesión".
- *
- *    Fix: se usa Gson (ya presente en el proyecto) para:
- *      1. Construir el cuerpo JSON de forma segura (escapa automáticamente).
- *      2. Parsear la respuesta de error de Firebase de manera robusta.
- *         Firebase envuelve el error en {"error":{"message":"CODE",...}}.
- *      3. Loggear el JSON crudo en caso de error no reconocido.
  */
 public class LoginController {
 
