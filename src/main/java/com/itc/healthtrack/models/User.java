@@ -1,15 +1,5 @@
 package com.itc.healthtrack.models;
 
-/**
- * Representa a un usuario dentro del sistema HealthTrack.
- *
- * NOTA DE SEGURIDAD: El campo "password" fue eliminado intencionalmente.
- * Las contraseñas son gestionadas de forma segura por Firebase Authentication
- * y NUNCA deben almacenarse en Firestore. El identificador único (uid) que
- * vincula este perfil con Firebase Auth se guarda en el campo "uid".
- *
- * Atributos en inglés y comentarios en español como se solicitó.
- */
 public class User {
 
     // Identificador único del usuario — corresponde al UID generado por Firebase Auth
