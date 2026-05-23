@@ -27,37 +27,22 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-/**
- * Controlador de inicio de sesión con dos formularios:
- *
- *  FORMULARIO "Paciente" (visible por defecto):
- *    - Solo requiere correo y contraseña.
- *    - Acepta roles "patient" y "admin".
- *
- *  FORMULARIO "Doctor" (reemplaza al anterior al activarse):
- *    - Requiere correo, contraseña y token de acceso médico.
- *    - Solo acepta rol "doctor" con token correcto.
- *
- */
+// controlador de la pantalla de inicio de sesion
+// tiene dos formularios uno para pacientes y admin y otro exclusivo para medicos con token
 public class LoginController {
 
-    // Credenciales Firebase Identity Toolkit REST API
+    // Credenciales REST API
     private static final String FIREBASE_WEB_API_KEY   = "AIzaSyBOlSDOZdQMwxy6Ev9t2hUbcV3PiB_4paI";
     private static final String FIREBASE_SIGN_IN_URL   =
             "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="
             + FIREBASE_WEB_API_KEY;
 
-    // -------------------------------------------------------------------
     // Formulario PACIENTE
-    // -------------------------------------------------------------------
     @FXML private TextField     emailField;
     @FXML private PasswordField passwordField;
     @FXML private Button        loginButton;
     @FXML private Label         errorLabel;
-
-    // -------------------------------------------------------------------
-    // Formularios alternos (toggle dentro del mismo panel derecho)
-    // -------------------------------------------------------------------
+    // Formularios alternos
     @FXML private VBox          patientForm;       // visible por defecto
     @FXML private VBox          doctorPanel;       // reemplaza al anterior
     @FXML private Button        btnToggleDoctor;
@@ -67,10 +52,6 @@ public class LoginController {
     @FXML private Button        doctorLoginButton;
 
     private final GenericDAO<User> userDAO = new GenericDAO<>(User.class, "users");
-
-    // -------------------------------------------------------------------
-    // Toggle entre formularios
-    // -------------------------------------------------------------------
 
     @FXML
     protected void onToggleDoctorPanel() {
@@ -89,9 +70,7 @@ public class LoginController {
         }
     }
 
-    // -------------------------------------------------------------------
     // Navegación a registro
-    // -------------------------------------------------------------------
 
     @FXML
     protected void onGoToRegister(ActionEvent event) {
@@ -112,9 +91,7 @@ public class LoginController {
         }
     }
 
-    // -------------------------------------------------------------------
-    // LOGIN — Formulario PACIENTE
-    // -------------------------------------------------------------------
+    // LOGIN
 
     @FXML
     protected void onLoginButtonClick(ActionEvent event) {
@@ -188,10 +165,7 @@ public class LoginController {
         }).start();
     }
 
-    // -------------------------------------------------------------------
-    // LOGIN — Formulario DOCTOR
-    // -------------------------------------------------------------------
-
+    // LOGIN
     @FXML
     protected void onDoctorLoginButtonClick(ActionEvent event) {
         String email    = doctorEmailField.getText().trim();
@@ -213,10 +187,10 @@ public class LoginController {
 
         new Thread(() -> {
             try {
-                // ── Paso 1: autenticar con Firebase Auth REST API ──────────
+                // autenticar con Firebase Auth REST API
                 String localId = signInWithEmailAndPassword(email, password);
 
-                // ── Paso 2: obtener perfil de Firestore ────────────────────
+                // obtener perfil de Firestore
                 User currentUser;
                 try {
                     currentUser = userDAO.getById(localId);
@@ -264,9 +238,7 @@ public class LoginController {
         }).start();
     }
 
-    // -------------------------------------------------------------------
     // Auto-asignación de médico para pacientes sin asignación
-    // -------------------------------------------------------------------
 
     private void autoAssignDoctorIfNeeded(User patient, ActionEvent event) {
         boolean needsDoctor = patient.getAssignedDoctorId() == null
@@ -294,16 +266,7 @@ public class LoginController {
 
     // -------------------------------------------------------------------
     // Autenticación — Firebase Identity Toolkit REST API
-    //
-    // CORRECCIÓN TAREA 1:
-    //   • Antes: cuerpo JSON construido con concatenación de strings
-    //            → contraseñas con " o \ generaban JSON malformado.
-    //   • Ahora: JsonObject de Gson → escapa automáticamente.
-    //
-    //   • Antes: extractJsonStringValue buscaba "message" con indexOf
-    //            → Firebase anida el error en {"error":{"message":"CODE"}}
-    //            lo que en algunos casos no era encontrado.
-    //   • Ahora: extractFirebaseErrorCode navega el JSON con Gson.
+    // usamos gson para construir el json y navegar la respuesta de error de firebase
     // -------------------------------------------------------------------
 
     private String signInWithEmailAndPassword(String email, String password) throws Exception {
@@ -353,11 +316,7 @@ public class LoginController {
         }
     }
 
-    /**
-     * Extrae el código de error de la respuesta de Firebase.
-     * Firebase Auth REST API devuelve:
-     *   {"error": {"code": 400, "message": "EMAIL_NOT_FOUND", ...}}
-     */
+    // lee el codigo de error que firebase manda dentro del json de respuesta
     private String extractFirebaseErrorCode(String errorJson) {
         try {
             JsonObject root  = JsonParser.parseString(errorJson).getAsJsonObject();
@@ -383,10 +342,7 @@ public class LoginController {
         return sb.toString();
     }
 
-    /**
-     * Traduce códigos de error de Firebase Auth al español.
-     * Si el código no se reconoce lo incluye en el mensaje para facilitar el debug.
-     */
+    // convierte los codigos de error de firebase a mensajes entendibles en espanol
     private String parseLoginError(String errorCode) {
         if (errorCode == null) {
             return "Error al iniciar sesión. Verifica tu conexión e inténtalo de nuevo.";
@@ -412,9 +368,7 @@ public class LoginController {
         }
     }
 
-    // -------------------------------------------------------------------
     // Navegación al Dashboard
-    // -------------------------------------------------------------------
 
     private void loadDashboard(ActionEvent event, User user) {
         try {

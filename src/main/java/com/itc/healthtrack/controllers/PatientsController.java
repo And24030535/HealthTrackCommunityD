@@ -29,7 +29,7 @@ public class PatientsController {
     @FXML private TableView<User>               tablePatients;
     @FXML private TableColumn<User, String>     colFirstName, colLastName, colEmail, colGender;
 
-    // DAOs
+    // dao para guardar y leer pacientes de firestore
     private final GenericDAO<User> userDao = new GenericDAO<>(User.class, "users");
 
     private final ObservableList<User> patientsObservableList = FXCollections.observableArrayList();
@@ -37,9 +37,7 @@ public class PatientsController {
     private User loggedInDoctor;
     private User selectedPatient = null;
 
-    // -------------------------------------------------------------------
     // Inicialización
-    // -------------------------------------------------------------------
 
     public void initData(User doctor) {
         this.loggedInDoctor = doctor;
@@ -48,9 +46,7 @@ public class PatientsController {
         loadPatients();
     }
 
-    // -------------------------------------------------------------------
     // Configuración de tabla
-    // -------------------------------------------------------------------
 
     private void setupTable() {
         colFirstName.setCellValueFactory(new PropertyValueFactory<>("firstName"));
@@ -68,9 +64,7 @@ public class PatientsController {
         });
     }
 
-    // -------------------------------------------------------------------
     // CRUD de pacientes
-    // -------------------------------------------------------------------
 
     private void loadPatients() {
         new Thread(() -> {
@@ -98,7 +92,7 @@ public class PatientsController {
     protected void onSavePatient() {
         try {
             if (selectedPatient == null) {
-                // ── CREAR NUEVO PACIENTE ─────────────────────────────────────────
+                // CREAR NUEVO PACIENTE
                 User newPatient = new User();
                 fillUserFromForm(newPatient);
                 newPatient.setRole("patient");
@@ -117,9 +111,6 @@ public class PatientsController {
                                 .setPassword(tempPassword);
                         UserRecord createdRecord = FirebaseAuth.getInstance().createUser(authRequest);
                         String uid = createdRecord.getUid();
-                        System.out.println("[PatientsController] Auth creado — UID: " + uid
-                                + " | contraseña temporal: " + tempPassword);
-
                         // PASO 2 — Guardar perfil en Firestore usando el UID de Auth como ID
                         newPatient.setUid(uid);
                         userDao.save(uid, newPatient);
@@ -127,8 +118,6 @@ public class PatientsController {
                         Platform.runLater(() -> {
                             onClearForm();
                             loadPatients();
-                            System.out.println("[PatientsController] Paciente creado. "
-                                    + "Contraseña temporal: " + tempPassword);
                         });
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -137,7 +126,7 @@ public class PatientsController {
                 }).start();
 
             } else {
-                // ── ACTUALIZAR PACIENTE EXISTENTE ────────────────────────────────
+                // ACTUALIZAR PACIENTE EXISTENTE
                 fillUserFromForm(selectedPatient);
                 new Thread(() -> {
                     try {
@@ -147,7 +136,7 @@ public class PatientsController {
                 }).start();
             }
         } catch (NumberFormatException e) {
-            System.out.println("Error: la altura debe ser un número.");
+            System.err.println("[PatientsController] Error: la altura debe ser un número.");
         }
     }
 
@@ -158,14 +147,14 @@ public class PatientsController {
 
         new Thread(() -> {
             try {
-                // PASO 1 — Eliminar cuenta de Firebase Authentication
+                // Eliminar cuenta de Firebase Authentication
                 // Sin este paso el paciente podría seguir autenticándose aunque no tenga perfil
                 if (uidToDelete != null && !uidToDelete.isEmpty()) {
                     FirebaseAuth.getInstance().deleteUser(uidToDelete);
                     System.out.println("[PatientsController] Auth eliminado — UID: " + uidToDelete);
                 }
 
-                // PASO 2 — Eliminar perfil de Firestore
+                // Eliminar perfil de Firestore
                 userDao.delete(uidToDelete);
 
                 Platform.runLater(() -> { onClearForm(); loadPatients(); });
@@ -189,6 +178,7 @@ public class PatientsController {
         tablePatients.getSelectionModel().clearSelection();
     }
 
+    // rellena los campos del formulario con los datos del paciente seleccionado
     private void fillForm(User p) {
         txtFirstName.setText(p.getFirstName());
         txtLastName .setText(p.getLastName());
@@ -198,6 +188,7 @@ public class PatientsController {
         txtHeight   .setText(p.getHeight() != null ? String.valueOf(p.getHeight()) : "");
     }
 
+    // copia lo que el usuario escribio en el formulario al objeto usuario
     private void fillUserFromForm(User u) {
         u.setFirstName(txtFirstName.getText());
         u.setLastName (txtLastName.getText());

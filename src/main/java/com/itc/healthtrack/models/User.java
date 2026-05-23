@@ -1,8 +1,10 @@
 package com.itc.healthtrack.models;
 
+import java.util.List;
+
 public class User {
 
-    // Identificador único del usuario — corresponde al UID generado por Firebase Auth
+    // Identificador único del usuario
     private String uid;
 
     // Correo electrónico del usuario, también usado como identificador en Firebase Auth
@@ -16,6 +18,12 @@ public class User {
 
     // Rol dentro del sistema: "patient", "doctor" o "admin"
     private String role;
+
+    // Contraseña almacenada en Firestore (campo heredado — no se usa en la lógica del desktop)
+    private String password;
+
+    // Lista de UIDs de pacientes asignados a un médico (campo heredado de documentos existentes)
+    private List<String> patientIds;
 
     // -------------------------------------------------------------------
     // Campos exclusivos para pacientes
@@ -72,6 +80,12 @@ public class User {
 
     public String getAssignedDoctorName() { return assignedDoctorName; }
     public void setAssignedDoctorName(String assignedDoctorName) { this.assignedDoctorName = assignedDoctorName; }
+
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
+
+    public List<String> getPatientIds() { return patientIds; }
+    public void setPatientIds(List<String> patientIds) { this.patientIds = patientIds; }
 
     @Override
     public String toString() {

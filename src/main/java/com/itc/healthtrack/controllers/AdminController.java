@@ -40,7 +40,7 @@ public class AdminController {
     @FXML private ComboBox<String> cbRoleFilter;                 // Filtro por rol
 
     // Datos y controladores
-    private final GenericDAO<User> userDao = new GenericDAO<>(User.class, "users"); // Acceso a datos de usuarios
+    private final GenericDAO<User> userDao = new GenericDAO<>(User.class, "users");
     private final ObservableList<User> usersObservableList = FXCollections.observableArrayList();  // Lista observable de usuarios
     private FilteredList<User> filteredList;                     // Lista filtrada para búsqueda
 
@@ -54,7 +54,7 @@ public class AdminController {
             case "patient": return "Paciente";
             case "doctor":  return "Doctor";
             case "admin":   return "Admin";
-            default:        return role;
+            default:                     return role;
         }
     }
 
@@ -298,8 +298,8 @@ public class AdminController {
         dialog.showAndWait();
     }
 
-    /*Metodo auxiliar que agrega una fila de detalle al GridPane.
-    Cada fila tiene una etiqueta (label) y un valor (value).*/
+    /*Metodo auxiliar que agrega una fila de detalle al GridPane
+    Cada fila tiene una etiqueta (label) y un valor (value)*/
     private int addDetailRow(GridPane grid, int row, String label, String value) {
         Label lbl = new Label(label + ":");
         lbl.setStyle("-fx-text-fill: #aaaaaa; -fx-font-weight: bold;");

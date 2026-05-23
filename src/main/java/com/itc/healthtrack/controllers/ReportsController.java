@@ -47,14 +47,13 @@ public class ReportsController {
     // Acceso a datos
     private final GenericDAO<User>           userDao           = new GenericDAO<>(User.class, "users");
     private final GenericDAO<Metric>         metricDao         = new GenericDAO<>(Metric.class, "metrics");
-    // Necesitamos las notas para incluirlas en el PDF
+    // tambien cargamos las notas para incluir la ultima recomendacion en el pdf
     private final GenericDAO<Recommendation> recommendationDao = new GenericDAO<>(Recommendation.class, "notas");
     private final UserService userService = new UserService();
     private User loggedInDoctor;
 
-    /*Inicializa el controlador con los datos del usuario logeado
-     Si es un paciente, muestra solo sus propios datos
-     Si es médico/admin, carga la lista de pacientes*/
+    // inicializa el controlador con el usuario que inicio sesion
+    // si es paciente ve solo sus datos y si es medico o admin ve la lista de pacientes
     public void initData(User doctor) {
         this.loggedInDoctor = doctor;
         if ("patient".equals(doctor.getRole())) {
@@ -117,7 +116,6 @@ public class ReportsController {
                     String alertsText          = buildAlertsText(history);
                     String recommendationText  = fetchLatestRecommendation(selectedPatient.getUid());
 
-                    // Los snapshots de gráficos deben tomarse en el hilo FX
                     Platform.runLater(() -> {
                         try {
                             lblStatus.setText("Generando gráficos...");
@@ -134,7 +132,7 @@ public class ReportsController {
                                     });
                                 } catch (Exception e) {
                                     Platform.runLater(() -> {
-                                        lblStatus.setText("Error crítico al generar el PDF.");
+                                        lblStatus.setText("Error al generar el PDF");
                                         lblStatus.setTextFill(javafx.scene.paint.Color.RED);
                                     });
                                     e.printStackTrace();
@@ -142,7 +140,7 @@ public class ReportsController {
                             }).start();
 
                         } catch (Exception e) {
-                            lblStatus.setText("Error al generar los gráficos.");
+                            lblStatus.setText("Error al generar los gráficos");
                             lblStatus.setTextFill(javafx.scene.paint.Color.RED);
                             e.printStackTrace();
                         }
@@ -150,7 +148,7 @@ public class ReportsController {
 
                 } catch (Exception e) {
                     Platform.runLater(() -> {
-                        lblStatus.setText("Error crítico al generar el PDF.");
+                        lblStatus.setText("Error al generar el PDF");
                         lblStatus.setTextFill(javafx.scene.paint.Color.RED);
                     });
                     e.printStackTrace();
@@ -159,8 +157,7 @@ public class ReportsController {
         }
     }
 
-    /*Utiliza la libreria iText para construir el PDF completo.
-     Incluye: encabezado, tabla de métricas, gráficos, alertas detectadas y recomendaciones.*/
+    // construye el PDF con iText incluyendo tabla de metricas graficos alertas y recomendaciones
     private void generatePDF(String destPath, User patient, List<Metric> history,
                               List<byte[]> chartImages,
                               String alertsText, String recommendationText) throws Exception {
@@ -220,14 +217,14 @@ public class ReportsController {
             }
         }
 
-        // ── Sección: Alertas Detectadas ─────────────────────────────────────
+        // Sección: Alertas detectadas
         document.add(new Paragraph(" "));
         document.add(new Paragraph("Alertas Detectadas")
                 .setBold().setFontSize(14));
         document.add(new Paragraph(alertsText != null ? alertsText : "Sin alertas.")
                 .setFontSize(11));
 
-        // ── Sección: Recomendaciones Clínicas ───────────────────────────────
+        //Sección: Recomendaciones Clínicas
         document.add(new Paragraph(" "));
         document.add(new Paragraph("Recomendaciones Clínicas")
                 .setBold().setFontSize(14));
@@ -239,9 +236,7 @@ public class ReportsController {
         document.close();
     }
 
-    /*Crea un gráfico de línea para presión arterial y un gráfico de barras para promedios.
-     Convierte los gráficos a imágenes PNG para incrustarlos en el PDF
-     Debe ser llamado desde el hilo de aplicación de JavaFX*/
+    // genera los graficos de presion arterial y promedios como imagenes PNG para el PDF
     private List<byte[]> buildChartImages(List<Metric> history) {
         List<byte[]> images = new ArrayList<>();
 
@@ -321,10 +316,7 @@ public class ReportsController {
         return images;
     }
 
-    /*
-     Renderiza un nodo de JavaFX en una escena temporal para aplicar CSS,
-     toma una captura de pantalla y la retorna como un array de bytes PNG
-     Debe ser llamado desde el hilo de aplicación de JavaFX*/
+    // convierte un nodo de javafx a imagen PNG tomandole una captura de pantalla
     private byte[] snapshotNodeToBytes(javafx.scene.Node node, double width, double height) {
         try {
             StackPane wrapper = new StackPane(node);
@@ -354,7 +346,7 @@ public class ReportsController {
         User selectedPatient = comboPatients.getValue();
 
         if (selectedPatient == null) {
-            lblStatus.setText("Por favor, selecciona un paciente primero.");
+            lblStatus.setText("Por favor, selecciona un paciente primero");
             lblStatus.setTextFill(javafx.scene.paint.Color.RED);
             return;
         }
@@ -385,13 +377,13 @@ public class ReportsController {
                 } catch (java.io.FileNotFoundException e) {
                     // Windows lanza FileNotFoundException cuando el archivo está abierto en Excel
                     Platform.runLater(() -> {
-                        lblStatus.setText("Cierra el archivo en Excel y vuelve a intentarlo.");
+                        lblStatus.setText("Cierra el archivo en Excel y vuelve a intentarlo");
                         lblStatus.setTextFill(javafx.scene.paint.Color.RED);
                     });
                     e.printStackTrace();
                 } catch (Exception e) {
                     Platform.runLater(() -> {
-                        lblStatus.setText("Error crítico al generar el Excel.");
+                        lblStatus.setText("Error crítico al generar el Excel");
                         lblStatus.setTextFill(javafx.scene.paint.Color.RED);
                     });
                     e.printStackTrace();
@@ -400,8 +392,7 @@ public class ReportsController {
         }
     }
 
-    /*Utiliza la librería Apache POI para construir y exportar un archivo Excel
-    Incluye información del paciente, médico y tabla con el historial de métricas  */
+    // construye el Excel con Apache POI incluyendo la informacion del paciente y sus metricas
     private void generateExcel(String destPath, User patient, List<Metric> history) throws Exception {
         Workbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet("Historial Clínico");
@@ -476,7 +467,7 @@ public class ReportsController {
     // Usa los mismos umbrales que MetricsController para mantener consistencia.
     private String buildAlertsText(List<Metric> history) {
         if (history == null || history.isEmpty()) {
-            return "Sin métricas registradas — no se pueden calcular alertas.";
+            return "Sin métricas registradas — no se pueden calcular alertas";
         }
 
         Metric latest = history.get(0); // La lista ya viene ordenada de más reciente a más antigua
@@ -487,13 +478,13 @@ public class ReportsController {
             int sys = latest.getSystolic(), dia = latest.getDiastolic();
             if (sys >= 180 || dia >= 120)
                 sb.append("• CRÍTICO: Hipertensión en crisis (")
-                  .append(sys).append("/").append(dia).append(" mmHg) — atención médica urgente.\n");
+                  .append(sys).append("/").append(dia).append(" mmHg) — atención médica urgente\n");
             else if (sys >= 140 || dia >= 90)
                 sb.append("• ALERTA: Hipertensión arterial (")
                   .append(sys).append("/").append(dia).append(" mmHg).\n");
             else if (sys >= 120)
                 sb.append("• AVISO: Presión en rango prehipertensivo (")
-                  .append(sys).append("/").append(dia).append(" mmHg).\n");
+                  .append(sys).append("/").append(dia).append(" mmHg)\n");
         }
 
         // Evaluamos la glucosa
@@ -501,21 +492,21 @@ public class ReportsController {
             double g = latest.getGlucoseLevel();
             if (g > 300)
                 sb.append("• CRÍTICO: Glucosa muy elevada (").append(g)
-                  .append(" mg/dL) — riesgo de cetoacidosis diabética.\n");
+                  .append(" mg/dL) — riesgo de cetoacidosis diabética\n");
             else if (g > 125)
                 sb.append("• ALERTA: Glucosa elevada (").append(g)
-                  .append(" mg/dL) — posible estado diabético.\n");
+                  .append(" mg/dL) — posible estado diabético\n");
             else if (g < 70)
-                sb.append("• ALERTA: Hipoglucemia (").append(g).append(" mg/dL).\n");
+                sb.append("• ALERTA: Hipoglucemia (").append(g).append(" mg/dL)\n");
         }
 
         // Evaluamos la frecuencia cardíaca
         if (latest.getHeartRate() != null) {
             int hr = latest.getHeartRate();
             if (hr > 120)
-                sb.append("• ALERTA: Taquicardia (").append(hr).append(" lpm).\n");
+                sb.append("• ALERTA: Taquicardia (").append(hr).append(" lpm)\n");
             else if (hr < 50)
-                sb.append("• ALERTA: Bradicardia (").append(hr).append(" lpm).\n");
+                sb.append("• ALERTA: Bradicardia (").append(hr).append(" lpm)\n");
         }
 
         // Evaluamos el IMC
@@ -523,22 +514,22 @@ public class ReportsController {
             double bmi = latest.getBmi();
             if (bmi >= 40)
                 sb.append("• ALERTA: Obesidad mórbida (IMC ").append(bmi)
-                  .append(") — riesgo cardiovascular alto.\n");
+                  .append(") — riesgo cardiovascular alto\n");
             else if (bmi >= 30)
                 sb.append("• AVISO: Obesidad (IMC ").append(bmi)
-                  .append(") — se recomienda plan nutricional.\n");
+                  .append(") — se recomienda plan nutricional\n");
             else if (bmi >= 25)
                 sb.append("• AVISO: Sobrepeso (IMC ").append(bmi)
-                  .append(") — incrementar actividad física.\n");
+                  .append(") — incrementar actividad física\n");
         }
 
         return sb.length() > 0
                 ? sb.toString().trim()
-                : "No se detectaron valores fuera del rango clínico normal.";
+                : "No se detectaron valores fuera del rango clínico normal";
     }
 
-    // Obtiene el análisis clínico más reciente guardado en Firestore para el paciente.
-    // Excluye las notas manuales del médico (type = "note") — solo trae análisis automáticos.
+    // Obtiene el análisis clínico más reciente guardado en Firestore para el paciente
+    // Excluye las notas manuales del médico (type = "note") — solo trae análisis automáticos
     private String fetchLatestRecommendation(String patientId) {
         try {
             List<Recommendation> all = recommendationDao.getByField("patientId", patientId);
@@ -555,10 +546,10 @@ public class ReportsController {
             }
             return (latest != null && latest.getMessage() != null)
                     ? latest.getMessage()
-                    : "No se ha generado ningún análisis clínico para este paciente aún.";
+                    : "No se ha generado ningún análisis clínico para este paciente aún";
         } catch (Exception e) {
             System.err.println("[ReportsController] Error al cargar recomendación: " + e.getMessage());
-            return "No disponible (error al conectar con la base de datos).";
+            return "No disponible (error al conectar con la base de datos)";
         }
     }
 }

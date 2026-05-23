@@ -9,9 +9,8 @@ import com.google.firebase.cloud.FirestoreClient;
 import java.io.IOException;
 import java.io.InputStream;
 
-/**
- * Gestiona la conexión única con Firebase Firestore.
- */
+// clase que maneja la conexion con firebase usando el patron singleton
+// solo se crea una conexion y se reutiliza en todo el proyecto
 public class FirebaseConnection {
 
     private static volatile FirebaseConnection instance;
@@ -19,7 +18,7 @@ public class FirebaseConnection {
 
     private FirebaseConnection() {
         try {
-            // Carga el archivo de credenciales desde la carpeta resources
+            // cargamos el archivo de credenciales que firebase necesita para autenticarse
             InputStream serviceAccount = getClass().getClassLoader().getResourceAsStream("firebase-key.json");
 
             if (serviceAccount == null) {
@@ -30,7 +29,7 @@ public class FirebaseConnection {
                     .setCredentials(GoogleCredentials.fromStream(serviceAccount))
                     .build();
 
-            // Inicializa la app solo si no ha sido inicializada previamente
+            // solo inicializamos la app si no habia sido inicializada antes
             if (FirebaseApp.getApps().isEmpty()) {
                 FirebaseApp.initializeApp(options);
             }
@@ -42,10 +41,7 @@ public class FirebaseConnection {
         }
     }
 
-    /**
-     * Obtiene la instancia única de la conexión.
-     * @return Instancia de FirebaseConnection.
-     */
+    // devuelve la unica instancia de la conexion creandola si es la primera vez
     public static FirebaseConnection getInstance() {
         if (instance == null) {
             synchronized (FirebaseConnection.class) {
@@ -57,10 +53,7 @@ public class FirebaseConnection {
         return instance;
     }
 
-    /**
-     * Proporciona el acceso a la base de datos Firestore.
-     * @return Objeto Firestore para realizar consultas.
-     */
+    // regresa el objeto firestore para poder hacer consultas a la base de datos
     public Firestore getFirestore() {
         return db;
     }

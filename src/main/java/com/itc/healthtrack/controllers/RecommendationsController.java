@@ -42,14 +42,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-// Controlador para la gestión de recomendaciones clínicas.
-// Usa exclusivamente GenericDAO<T> para acceder a Firestore —
-// no depende de PatientDAO, MetricDAO ni RecommendationDAO.
+// Controlador para la gestión de recomendaciones clínicas
+// Usa exclusivamente GenericDAO<T> para acceder a Firestore
+// no depende de PatientDAO, MetricDAO ni RecommendationDAO
 public class RecommendationsController {
 
-    // -------------------------------------------------------------------
-    // Elementos de interfaz (inyectados desde recommendations-view.fxml)
-    // -------------------------------------------------------------------
+    // Elementos de interfaz
     @FXML private ComboBox<User>           comboPatients;       // Selector de paciente
     @FXML private TextArea                 txtRecommendations;  // Análisis clínico generado
     @FXML private TextArea                 txtWebService;       // Datos FDA
@@ -64,14 +62,10 @@ public class RecommendationsController {
     @FXML private Label     lblRecommendationStatus;  // Resultado del último envío
     @FXML private VBox      vboxNotesList;            // Contenedor dinámico de notas guardadas
 
-    // -------------------------------------------------------------------
-    // DAOs — solo GenericDAO<T>, sin DAOs especializados
-    // -------------------------------------------------------------------
-    // Accede a la colección "users" para obtener pacientes
+
+    // daos para leer usuarios, metricas y notas de firestore
     private final GenericDAO<User>           userDAO           = new GenericDAO<>(User.class, "users");
-    // Accede a la colección "metrics" para leer el historial clínico del paciente
     private final GenericDAO<Metric>         metricDAO         = new GenericDAO<>(Metric.class, "metrics");
-    // Accede a la colección "notas" para guardar y recuperar análisis
     private final GenericDAO<Recommendation> recommendationDAO = new GenericDAO<>(Recommendation.class, "notas");
 
     private final NotificationService notificationService = new NotificationService();
@@ -82,9 +76,8 @@ public class RecommendationsController {
     private User loggedInDoctor;                          // Usuario médico/admin logeado
     private ObservableList<Recommendation> historyItems; // Lista observable del historial
 
-    // -------------------------------------------------------------------
+
     // Inicialización
-    // -------------------------------------------------------------------
 
     // Recibe el usuario logeado y configura la vista según su rol:
     //   - Paciente → ve solo sus propios datos, ComboBox deshabilitado
@@ -164,9 +157,7 @@ public class RecommendationsController {
         }
     }
 
-    // -------------------------------------------------------------------
     // Carga de datos
-    // -------------------------------------------------------------------
 
     // Carga la lista de pacientes usando UserService para evitar duplicar la lógica de filtrado
     private void loadPatients() {
@@ -280,9 +271,7 @@ public class RecommendationsController {
         }
     }
 
-    // -------------------------------------------------------------------
     // Análisis clínico principal
-    // -------------------------------------------------------------------
 
     // Se ejecuta al presionar "Generar Análisis Clínico".
     // 1. Obtiene las métricas del paciente usando GenericDAO<Metric>.
@@ -359,10 +348,7 @@ public class RecommendationsController {
         }).start();
     }
 
-    // -------------------------------------------------------------------
-    // Obtención de métricas via GenericDAO (reemplaza MetricDAO)
-    // -------------------------------------------------------------------
-
+    // Obtención de métricas GenericDAO (reemplaza MetricDAO)
     // Obtiene todas las métricas del paciente indicado y las ordena por fecha descendente.
     // Usa GenericDAO<Metric>.getByField("patientId", patientId) — sin MetricDAO.
     private List<Metric> getMetricsByPatient(String patientId) throws Exception {
@@ -371,9 +357,7 @@ public class RecommendationsController {
         return metrics;
     }
 
-    // -------------------------------------------------------------------
     // Persistencia de recomendación via GenericDAO (reemplaza RecommendationDAO)
-    // -------------------------------------------------------------------
 
     // Guarda el análisis generado en la colección "notas" de Firestore.
     // Usa GenericDAO<Recommendation>.save() en lugar de RecommendationDAO.
@@ -405,9 +389,7 @@ public class RecommendationsController {
         }).start();
     }
 
-    // -------------------------------------------------------------------
     // Lógica clínica (sin cambios respecto al original)
-    // -------------------------------------------------------------------
 
     // Consulta el clima actual desde Open-Meteo (Celaya, Guanajuato)
     private String fetchWeatherData() {
@@ -567,10 +549,8 @@ public class RecommendationsController {
         if (latest.getBmi()          != null && latest.getBmi()          >= 30)  return "low calorie high fiber foods";
         return "mediterranean diet healthy foods";
     }
-
-    // -------------------------------------------------------------------
-    // Servicios web externos (sin cambios)
-    // -------------------------------------------------------------------
+    
+    // Servicios web externos
 
     // Consulta la API openFDA para obtener datos de medicamentos relacionados
     private void fetchExternalMedicalData() {
@@ -678,11 +658,7 @@ public class RecommendationsController {
         }).start();
     }
 
-    /**
-     * Guarda una recomendación formal en Firestore y la envía al paciente por correo electrónico.
-     * Solo disponible para usuarios con rol "doctor".
-     * Usa el título de txtRecommendationTitle y el mensaje de txtNoteInput.
-     */
+    //Guarda una recomendación formal en Firestore y la envía al paciente por correo electrónico
     @FXML
     protected void onSendRecommendation() {
         // Verificación de rol: solo médicos pueden enviar recomendaciones por email
@@ -733,12 +709,12 @@ public class RecommendationsController {
 
         new Thread(() -> {
             try {
-                // 1. Guardar en Firestore
+                // guarda en Firestore
                 String newId = recommendationDAO.createDocumentId();
                 rec.setId(newId);
                 recommendationDAO.save(newId, rec);
 
-                // 2. Enviar correo al paciente
+                // envia correo al paciente
                 notificationService.sendRecommendationEmail(patient, doctorName, title, message);
 
                 Platform.runLater(() -> {
@@ -809,9 +785,7 @@ public class RecommendationsController {
         }
     }
 
-    // -------------------------------------------------------------------
-    // Exportación a Excel — Inteligencia Clínica
-    // -------------------------------------------------------------------
+    // Exportación a Excel
 
     // Se ejecuta al presionar "Exportar Excel".
     // 1. Verifica que haya un paciente seleccionado.
@@ -979,9 +953,7 @@ public class RecommendationsController {
             fuenteTitulo.setFontHeightInPoints((short) 14);
             estiloTitulo.setFont(fuenteTitulo);
 
-            // ──────────────────────────────────────────────────────────────
             // HOJA 1: Análisis del Paciente
-            // ──────────────────────────────────────────────────────────────
             Sheet hoja1 = workbook.createSheet("Análisis del Paciente");
             int fila = 0;
 
@@ -1021,9 +993,7 @@ public class RecommendationsController {
 
             hoja1.setColumnWidth(0, 90 * 256); // Columna ancha para texto largo
 
-            // ──────────────────────────────────────────────────────────────
             // HOJA 2: Historial de Métricas
-            // ──────────────────────────────────────────────────────────────
             Sheet hoja2 = workbook.createSheet("Historial de Métricas");
             String[] columnasMetricas = {
                 "Fecha",
@@ -1043,7 +1013,7 @@ public class RecommendationsController {
                 c.setCellStyle(estiloEncabezado);
             }
 
-            // Filas de datos — una fila por cada lectura registrada
+            // Filas de datos
             int filaDato = 1;
             for (Metric m : metricas) {
                 Row fila2 = hoja2.createRow(filaDato++);
@@ -1061,9 +1031,7 @@ public class RecommendationsController {
             // Ajustar ancho automático de todas las columnas
             for (int i = 0; i < columnasMetricas.length; i++) hoja2.autoSizeColumn(i);
 
-            // ──────────────────────────────────────────────────────────────
             // HOJA 3: Recomendaciones
-            // ──────────────────────────────────────────────────────────────
             Sheet hoja3 = workbook.createSheet("Recomendaciones");
             String[] columnasRec = { "Fecha", "Tipo", "Título", "Mensaje" };
 
@@ -1075,7 +1043,7 @@ public class RecommendationsController {
                 c.setCellStyle(estiloEncabezado);
             }
 
-            // Filas de datos — un análisis por fila
+            // Filas de datos
             int filaRec = 1;
             for (Recommendation rec : recs) {
                 Row filaR = hoja3.createRow(filaRec++);
@@ -1095,7 +1063,6 @@ public class RecommendationsController {
             for (int i = 0; i < 3; i++) hoja3.autoSizeColumn(i);
             hoja3.setColumnWidth(3, 60 * 256);
 
-            // ── Escribir el workbook en disco ──────────────────────────────
             try (FileOutputStream salida = new FileOutputStream(archivo)) {
                 workbook.write(salida);
             }

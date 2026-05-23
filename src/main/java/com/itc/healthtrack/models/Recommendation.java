@@ -2,23 +2,24 @@ package com.itc.healthtrack.models;
 
 import com.google.cloud.Timestamp;
 
-//Representa una recomendación o alerta médica enviada a un paciente,
-// o una nota clínica escrita manualmente por un médico (type = "note").
+// representa una nota medica o recomendacion guardada en firestore
+// puede ser un analisis automatico del sistema o una nota escrita por el medico
 public class Recommendation {
     private String id;
     private String patientId;
-    // UID del médico autor — obligatorio cuando type = "note", null en análisis automáticos
+    // uid del medico que escribio la nota (null en analisis automaticos)
     private String doctorId;
     private Timestamp generatedAt;
+    // tipo de entrada: "suggestion" para analisis automaticos, "note" o "doctor_recommendation" para notas manuales
     private String type;
     private String title;
     private String message;
     private Boolean isRead;
 
-    // Constructor vacío requerido por Firestore
+    // constructor vacio requerido por firestore para deserializar documentos
     public Recommendation() {}
 
-    // Getters y Setters
+    // getters y setters
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }

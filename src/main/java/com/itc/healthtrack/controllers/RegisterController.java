@@ -20,29 +20,13 @@ import org.kordamp.bootstrapfx.BootstrapFX;
 
 import java.util.List;
 
-/**
- * Controlador de registro de nuevos usuarios.
- *
- * ROLES Y TOKENS DE SEGURIDAD:
- *   Paciente  → sin token requerido (registro libre).
- *   Doctor    → debe ingresar TOKEN_DOCTOR para validar acceso médico.
- *   Admin     → debe ingresar TOKEN_ADMIN  (código maestro de administrador).
- *   Token incorrecto o vacío → se muestra alerta y se bloquea el registro.
- *
- * FLUJO:
- *   1. Usuario selecciona rol — el campo de token aparece dinámicamente para
- *      roles elevados (Doctor / Admin).
- *   2. Se validan los campos y el token en el hilo de la UI.
- *   3. Se crea la cuenta en Firebase Auth (Admin SDK).
- *   4. Se guarda el perfil completo (con rol) en Firestore, SIN contraseña.
- */
+// controlador para registrar nuevos usuarios en el sistema
+// segun el rol elegido puede requerir un token de acceso para medicos y admins
 public class RegisterController {
 
     // Los tokens de seguridad están centralizados en AppConfig para evitar duplicación
 
-    // -------------------------------------------------------------------
-    // Campos del formulario — deben coincidir con fx:id en register-view.fxml
-    // -------------------------------------------------------------------
+    // Campos del formulario
     @FXML private TextField        txtFirstName;
     @FXML private TextField        txtLastName;
     @FXML private TextField        txtEmail;
@@ -53,7 +37,7 @@ public class RegisterController {
     @FXML private ComboBox<String> comboGender;    // M / F / Otro
     @FXML private ComboBox<String> comboRole;      // Paciente / Doctor / Admin
 
-    // Sección de token — visible dinámicamente para Doctor / Admin
+    // Sección de token
     @FXML private VBox      tokenSection;
     @FXML private Label     lblTokenLabel;
     @FXML private TextField txtToken;
@@ -61,13 +45,10 @@ public class RegisterController {
     @FXML private Label  lblStatus;
     @FXML private Button btnRegister;
 
-    // Único DAO necesario: GenericDAO apuntando a la colección "users"
+    // unico dao que necesitamos para guardar el nuevo perfil en firestore
     private final GenericDAO<User> userDAO = new GenericDAO<>(User.class, "users");
 
-    // -------------------------------------------------------------------
     // Inicialización
-    // -------------------------------------------------------------------
-
     @FXML
     public void initialize() {
         comboGender.getItems().addAll("M", "F", "Otro");
@@ -90,14 +71,11 @@ public class RegisterController {
         });
     }
 
-    // -------------------------------------------------------------------
     // Registro
-    // -------------------------------------------------------------------
-
     @FXML
     protected void onRegister(ActionEvent event) {
 
-        // ── Leer TODOS los valores de la UI en el hilo FX antes del hilo de fondo ──
+        // Leer TODOS los valores de la UI en el hilo FX antes del hilo
         final String firstName    = txtFirstName.getText().trim();
         final String lastName     = txtLastName.getText().trim();
         final String email        = txtEmail.getText().trim();
@@ -110,7 +88,7 @@ public class RegisterController {
         final String birthDateStr = dpBirthDate.getValue() != null
                 ? dpBirthDate.getValue().toString() : null;
 
-        // ── Validaciones básicas ───────────────────────────────────────────
+        //Validaciones básicas
         if (firstName.isEmpty() || lastName.isEmpty() || email.isEmpty() || password.isEmpty()) {
             showStatus("Por favor, completa todos los campos obligatorios.", false);
             return;
@@ -128,7 +106,7 @@ public class RegisterController {
             return;
         }
 
-        // ── Validación de token para roles elevados ────────────────────────
+        // Validación de token para roles elevados
         if ("Doctor".equals(roleLabel)) {
             if (tokenInput.isEmpty()) {
                 showTokenAlert("Se requiere el código de acceso médico para registrarse como Doctor.\n"
@@ -153,15 +131,15 @@ public class RegisterController {
             }
         }
 
-        // ── Mapear etiqueta de rol a valor interno ────────────────────────
+        // Mapear etiqueta de rol a valor interno
         final String mappedRole;
         switch (roleLabel) {
-            case "Doctor": mappedRole = "doctor"; break;
-            case "Admin":  mappedRole = "admin";  break;
+            case "Doctor": mappedRole = "doctor";  break;
+            case "Admin":  mappedRole = "admin";   break;
             default:       mappedRole = "patient"; break;
         }
 
-        // ── Validar formato de altura ──────────────────────────────────────
+        // Validar formato de altura
         Double parsedHeight = null;
         if (!heightText.isEmpty()) {
             try {
@@ -178,7 +156,7 @@ public class RegisterController {
         new Thread(() -> {
             try {
 
-                // PASO 1 — Crear cuenta en Firebase Auth (Admin SDK)
+                // Crear cuenta en Firebase Auth (Admin SDK)
                 UserRecord.CreateRequest authRequest = new UserRecord.CreateRequest()
                         .setEmail(email)
                         .setPassword(password);
@@ -186,18 +164,18 @@ public class RegisterController {
                 String uid = createdRecord.getUid();
                 System.out.println("[RegisterController] Auth OK — UID: " + uid);
 
-                // PASO 2 — Construir perfil para Firestore (sin contraseña)
+                // Construir perfil para Firestore (sin contraseña)
                 User profile = new User();
                 profile.setUid(uid);
                 profile.setEmail(email);
                 profile.setFirstName(firstName);
                 profile.setLastName(lastName);
-                profile.setRole(mappedRole);        // rol validado por token
+                profile.setRole(mappedRole);  // rol validado por token
                 profile.setGender(gender);
                 if (birthDateStr != null) profile.setBirthDate(birthDateStr);
                 if (finalHeight  != null) profile.setHeight(finalHeight);
 
-                // PASO 3 — Auto-asignar médico si el nuevo usuario es paciente
+                // Auto-asignar médico si el nuevo usuario es paciente
                 if ("patient".equals(mappedRole)) {
                     List<User> doctors = userDAO.getByField("role", "doctor");
                     if (!doctors.isEmpty()) {
@@ -208,7 +186,7 @@ public class RegisterController {
                     }
                 }
 
-                // PASO 4 — Guardar perfil en Firestore usando el UID como ID del documento
+                // Guardar perfil en Firestore usando el UID como ID del documento
                 userDAO.save(uid, profile);
                 System.out.println("[RegisterController] Perfil guardado en Firestore — UID: " + uid
                         + ", rol: " + mappedRole);
@@ -249,9 +227,8 @@ public class RegisterController {
         }).start();
     }
 
-    // -------------------------------------------------------------------
-    // Alerta de token inválido — usa DialogUtils para estilo uniforme
-    // -------------------------------------------------------------------
+    // Alerta de token inválido
+
 
     private void showTokenAlert(String message) {
         Alert alert = new Alert(Alert.AlertType.WARNING);
@@ -262,14 +239,8 @@ public class RegisterController {
         alert.showAndWait();
     }
 
-    // -------------------------------------------------------------------
     // Helpers de Firebase Auth
-    // -------------------------------------------------------------------
-
-    /**
-     * Extrae el código de error con compatibilidad entre versiones del SDK.
-     * Firebase Admin SDK 9+ usa getAuthErrorCode(); versiones anteriores, getErrorCode().
-     */
+    // obtiene el codigo de error de firebase con compatibilidad entre versiones del SDK
     private String resolveAuthErrorCode(com.google.firebase.auth.FirebaseAuthException ex) {
         try { if (ex.getAuthErrorCode() != null) return ex.getAuthErrorCode().name(); }
         catch (Exception ignored) {}
@@ -278,7 +249,7 @@ public class RegisterController {
         return ex.getMessage() != null ? ex.getMessage() : "UNKNOWN";
     }
 
-    /** Traduce códigos de Firebase Auth a mensajes en español. */
+    // convierte los codigos de error del registro a mensajes en espanol
     private String parseAuthError(String code) {
         if (code == null) return "Error al registrar la cuenta. Intenta de nuevo.";
         switch (code) {
@@ -295,9 +266,7 @@ public class RegisterController {
         }
     }
 
-    // -------------------------------------------------------------------
     // Navegación
-    // -------------------------------------------------------------------
 
     @FXML
     protected void onGoToLogin(ActionEvent event) {
@@ -322,9 +291,7 @@ public class RegisterController {
         }
     }
 
-    // -------------------------------------------------------------------
     // UI helper
-    // -------------------------------------------------------------------
 
     private void showStatus(String message, boolean isSuccess) {
         lblStatus.setText(message);

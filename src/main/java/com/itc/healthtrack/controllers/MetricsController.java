@@ -206,7 +206,7 @@ public class MetricsController {
         calculateAverages(filteredList);
     }
 
-    /*Calcula y muestra los promedios de presión arterial, glucosa y peso para el período de datos actualmente visible  */
+    //Calcula y muestra los promedios de presión arterial, glucosa y peso para el período de datos actualmente visible
     private void calculateAverages(List<Metric> data) {
         if (data.isEmpty()) {
             lblAvgBP.setText("PA: --/-- mmHg");
