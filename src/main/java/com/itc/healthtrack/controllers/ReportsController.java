@@ -5,6 +5,7 @@ import com.itc.healthtrack.models.Metric;
 import com.itc.healthtrack.models.Recommendation;
 import com.itc.healthtrack.models.User;
 import com.itc.healthtrack.services.UserService;
+import com.itc.healthtrack.utils.AlertUtils;
 import com.itc.healthtrack.utils.MetricUtils;
 import com.itextpdf.io.image.ImageData;
 import com.itextpdf.io.image.ImageDataFactory;
@@ -113,7 +114,7 @@ public class ReportsController {
 
                     // Calculamos alertas y obtenemos la última recomendación
                     // en este mismo hilo de fondo para no bloquear la interfaz
-                    String alertsText          = buildAlertsText(history);
+                    String alertsText          = AlertUtils.buildAlertsText(history);
                     String recommendationText  = fetchLatestRecommendation(selectedPatient.getUid());
 
                     Platform.runLater(() -> {
@@ -285,25 +286,13 @@ public class ReportsController {
             XYChart.Series<String, Number> avgSeries = new XYChart.Series<>();
             avgSeries.setName("Promedio");
 
-            // Calcular promedios de cada métrica
-            int sysTotal = 0, diaTotal = 0, hrTotal = 0;
-            double glTotal = 0, weightTotal = 0;
-            int sysCount = 0, diaCount = 0, hrCount = 0, glCount = 0, weightCount = 0;
-
-            for (Metric m : history) {
-                if (m.getSystolic() != null)     { sysTotal    += m.getSystolic();    sysCount++;    }
-                if (m.getDiastolic() != null)    { diaTotal    += m.getDiastolic();   diaCount++;    }
-                if (m.getHeartRate() != null)    { hrTotal     += m.getHeartRate();   hrCount++;     }
-                if (m.getGlucoseLevel() != null) { glTotal     += m.getGlucoseLevel(); glCount++;   }
-                if (m.getWeight() != null)       { weightTotal += m.getWeight();      weightCount++; }
-            }
-
-            // Agregar los promedios calculados al gráfico
-            if (sysCount > 0)    avgSeries.getData().add(new XYChart.Data<>("Sistólica",   sysTotal    / (double) sysCount));
-            if (diaCount > 0)    avgSeries.getData().add(new XYChart.Data<>("Diastólica",  diaTotal    / (double) diaCount));
-            if (hrCount > 0)     avgSeries.getData().add(new XYChart.Data<>("F.Cardíaca",  hrTotal     / (double) hrCount));
-            if (glCount > 0)     avgSeries.getData().add(new XYChart.Data<>("Glucosa",     glTotal     / (double) glCount));
-            if (weightCount > 0) avgSeries.getData().add(new XYChart.Data<>("Peso (kg)",   weightTotal / (double) weightCount));
+            // Delegamos el conteo y suma a MetricUtils — sólo agregamos los promedios con dato
+            MetricUtils.Averages avg = MetricUtils.computeAverages(history);
+            if (avg.systolicAvg  != null) avgSeries.getData().add(new XYChart.Data<>("Sistólica",   avg.systolicAvg));
+            if (avg.diastolicAvg != null) avgSeries.getData().add(new XYChart.Data<>("Diastólica",  avg.diastolicAvg));
+            if (avg.heartRateAvg != null) avgSeries.getData().add(new XYChart.Data<>("F.Cardíaca",  avg.heartRateAvg));
+            if (avg.glucoseAvg   != null) avgSeries.getData().add(new XYChart.Data<>("Glucosa",     avg.glucoseAvg));
+            if (avg.weightAvg    != null) avgSeries.getData().add(new XYChart.Data<>("Peso (kg)",   avg.weightAvg));
 
             barChart.getData().add(avgSeries);
             byte[] barBytes = snapshotNodeToBytes(barChart, 620, 280);
@@ -393,67 +382,68 @@ public class ReportsController {
     }
 
     // construye el Excel con Apache POI incluyendo la informacion del paciente y sus metricas
+    // try-with-resources garantiza que el workbook se cierre aun si ocurre una excepcion al escribir
     private void generateExcel(String destPath, User patient, List<Metric> history) throws Exception {
-        Workbook workbook = new XSSFWorkbook();
-        Sheet sheet = workbook.createSheet("Historial Clínico");
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Historial Clínico");
 
-        // Estilo para los encabezados
-        CellStyle headerStyle = workbook.createCellStyle();
-        Font font = workbook.createFont();
-        font.setBold(true);
-        headerStyle.setFont(font);
+            // Estilo para los encabezados
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font font = workbook.createFont();
+            font.setBold(true);
+            headerStyle.setFont(font);
 
-        // Informacion del paciente
-        Row titleRow = sheet.createRow(0);
-        titleRow.createCell(0).setCellValue("Reporte Clínico - HealthTrack Community");
+            // Informacion del paciente
+            Row titleRow = sheet.createRow(0);
+            titleRow.createCell(0).setCellValue("Reporte Clínico - HealthTrack Community");
 
-        Row patientRow = sheet.createRow(1);
-        patientRow.createCell(0).setCellValue("Paciente: " + patient.getFirstName() + " " + patient.getLastName());
+            Row patientRow = sheet.createRow(1);
+            patientRow.createCell(0).setCellValue("Paciente: " + patient.getFirstName() + " " + patient.getLastName());
 
-        // Información del médico si está disponible
-        if (loggedInDoctor != null
-                && ("doctor".equals(loggedInDoctor.getRole()) || "admin".equals(loggedInDoctor.getRole()))) {
-            Row doctorRow = sheet.createRow(2);
-            doctorRow.createCell(0).setCellValue("Médico a cargo: " + loggedInDoctor.getFirstName() + " " + loggedInDoctor.getLastName());
+            // Información del médico si está disponible
+            if (loggedInDoctor != null
+                    && ("doctor".equals(loggedInDoctor.getRole()) || "admin".equals(loggedInDoctor.getRole()))) {
+                Row doctorRow = sheet.createRow(2);
+                doctorRow.createCell(0).setCellValue("Médico a cargo: " + loggedInDoctor.getFirstName() + " " + loggedInDoctor.getLastName());
+            }
+
+            // Encabezados de la tabla
+            Row headerRow = sheet.createRow(4);
+            String[] columns = {"Fecha y Hora", "Presión (Sis/Dia)", "Pulso", "Glucosa", "Peso (kg)"};
+            for (int i = 0; i < columns.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(columns[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            // Llenado de datos
+            int rowNum = 5;
+            for (Metric m : history) {
+                Row row = sheet.createRow(rowNum++);
+
+                String date = m.getTimestamp() != null ? m.getTimestamp().toDate().toString() : "N/A";
+                String bp = (m.getSystolic() != null && m.getDiastolic() != null) ? m.getSystolic() + "/" + m.getDiastolic() : "-";
+                String pulse = m.getHeartRate() != null ? String.valueOf(m.getHeartRate()) : "-";
+                String glucose = m.getGlucoseLevel() != null ? String.valueOf(m.getGlucoseLevel()) : "-";
+                String weight = m.getWeight() != null ? String.valueOf(m.getWeight()) : "-";
+
+                row.createCell(0).setCellValue(date);
+                row.createCell(1).setCellValue(bp);
+                row.createCell(2).setCellValue(pulse);
+                row.createCell(3).setCellValue(glucose);
+                row.createCell(4).setCellValue(weight);
+            }
+
+            // Ajuste automatico del ancho de las columnas
+            for (int i = 0; i < columns.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            // Escritura del archivo fisico
+            try (FileOutputStream fileOut = new FileOutputStream(destPath)) {
+                workbook.write(fileOut);
+            }
         }
-
-        // Encabezados de la tabla
-        Row headerRow = sheet.createRow(4);
-        String[] columns = {"Fecha y Hora", "Presión (Sis/Dia)", "Pulso", "Glucosa", "Peso (kg)"};
-        for (int i = 0; i < columns.length; i++) {
-            Cell cell = headerRow.createCell(i);
-            cell.setCellValue(columns[i]);
-            cell.setCellStyle(headerStyle);
-        }
-
-        // Llenado de datos
-        int rowNum = 5;
-        for (Metric m : history) {
-            Row row = sheet.createRow(rowNum++);
-
-            String date = m.getTimestamp() != null ? m.getTimestamp().toDate().toString() : "N/A";
-            String bp = (m.getSystolic() != null && m.getDiastolic() != null) ? m.getSystolic() + "/" + m.getDiastolic() : "-";
-            String pulse = m.getHeartRate() != null ? String.valueOf(m.getHeartRate()) : "-";
-            String glucose = m.getGlucoseLevel() != null ? String.valueOf(m.getGlucoseLevel()) : "-";
-            String weight = m.getWeight() != null ? String.valueOf(m.getWeight()) : "-";
-
-            row.createCell(0).setCellValue(date);
-            row.createCell(1).setCellValue(bp);
-            row.createCell(2).setCellValue(pulse);
-            row.createCell(3).setCellValue(glucose);
-            row.createCell(4).setCellValue(weight);
-        }
-
-        // Ajuste automatico del ancho de las columnas
-        for (int i = 0; i < columns.length; i++) {
-            sheet.autoSizeColumn(i);
-        }
-
-        // Escritura del archivo fisico
-        try (FileOutputStream fileOut = new FileOutputStream(destPath)) {
-            workbook.write(fileOut);
-        }
-        workbook.close();
     }
 
     // Obtiene el historial de métricas de un paciente y lo ordena por fecha
@@ -461,71 +451,6 @@ public class ReportsController {
         List<Metric> metrics = metricDao.getByField("patientId", patientId);
         MetricUtils.sortByTimestampDesc(metrics);
         return metrics;
-    }
-
-    // Analiza la métrica más reciente y devuelve un texto con todas las alertas clínicas detectadas.
-    // Usa los mismos umbrales que MetricsController para mantener consistencia.
-    private String buildAlertsText(List<Metric> history) {
-        if (history == null || history.isEmpty()) {
-            return "Sin métricas registradas — no se pueden calcular alertas";
-        }
-
-        Metric latest = history.get(0); // La lista ya viene ordenada de más reciente a más antigua
-        StringBuilder sb = new StringBuilder();
-
-        // Evaluamos la presión arterial
-        if (latest.getSystolic() != null && latest.getDiastolic() != null) {
-            int sys = latest.getSystolic(), dia = latest.getDiastolic();
-            if (sys >= 180 || dia >= 120)
-                sb.append("• CRÍTICO: Hipertensión en crisis (")
-                  .append(sys).append("/").append(dia).append(" mmHg) — atención médica urgente\n");
-            else if (sys >= 140 || dia >= 90)
-                sb.append("• ALERTA: Hipertensión arterial (")
-                  .append(sys).append("/").append(dia).append(" mmHg).\n");
-            else if (sys >= 120)
-                sb.append("• AVISO: Presión en rango prehipertensivo (")
-                  .append(sys).append("/").append(dia).append(" mmHg)\n");
-        }
-
-        // Evaluamos la glucosa
-        if (latest.getGlucoseLevel() != null) {
-            double g = latest.getGlucoseLevel();
-            if (g > 300)
-                sb.append("• CRÍTICO: Glucosa muy elevada (").append(g)
-                  .append(" mg/dL) — riesgo de cetoacidosis diabética\n");
-            else if (g > 125)
-                sb.append("• ALERTA: Glucosa elevada (").append(g)
-                  .append(" mg/dL) — posible estado diabético\n");
-            else if (g < 70)
-                sb.append("• ALERTA: Hipoglucemia (").append(g).append(" mg/dL)\n");
-        }
-
-        // Evaluamos la frecuencia cardíaca
-        if (latest.getHeartRate() != null) {
-            int hr = latest.getHeartRate();
-            if (hr > 120)
-                sb.append("• ALERTA: Taquicardia (").append(hr).append(" lpm)\n");
-            else if (hr < 50)
-                sb.append("• ALERTA: Bradicardia (").append(hr).append(" lpm)\n");
-        }
-
-        // Evaluamos el IMC
-        if (latest.getBmi() != null) {
-            double bmi = latest.getBmi();
-            if (bmi >= 40)
-                sb.append("• ALERTA: Obesidad mórbida (IMC ").append(bmi)
-                  .append(") — riesgo cardiovascular alto\n");
-            else if (bmi >= 30)
-                sb.append("• AVISO: Obesidad (IMC ").append(bmi)
-                  .append(") — se recomienda plan nutricional\n");
-            else if (bmi >= 25)
-                sb.append("• AVISO: Sobrepeso (IMC ").append(bmi)
-                  .append(") — incrementar actividad física\n");
-        }
-
-        return sb.length() > 0
-                ? sb.toString().trim()
-                : "No se detectaron valores fuera del rango clínico normal";
     }
 
     // Obtiene el análisis clínico más reciente guardado en Firestore para el paciente

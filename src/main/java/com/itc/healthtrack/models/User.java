@@ -1,7 +1,5 @@
 package com.itc.healthtrack.models;
 
-import java.util.List;
-
 public class User {
 
     // Identificador único del usuario
@@ -19,15 +17,7 @@ public class User {
     // Rol dentro del sistema: "patient", "doctor" o "admin"
     private String role;
 
-    // Contraseña almacenada en Firestore (campo heredado — no se usa en la lógica del desktop)
-    private String password;
-
-    // Lista de UIDs de pacientes asignados a un médico (campo heredado de documentos existentes)
-    private List<String> patientIds;
-
-    // -------------------------------------------------------------------
     // Campos exclusivos para pacientes
-    // -------------------------------------------------------------------
 
     // Fecha de nacimiento almacenada como texto para simplicidad en FXML (ej: "2000-01-15")
     private String birthDate;
@@ -47,9 +37,7 @@ public class User {
     // Constructor vacío requerido por Firestore para deserializar documentos automáticamente
     public User() {}
 
-    // -------------------------------------------------------------------
     // Getters y Setters
-    // -------------------------------------------------------------------
 
     public String getUid() { return uid; }
     public void setUid(String uid) { this.uid = uid; }
@@ -80,12 +68,6 @@ public class User {
 
     public String getAssignedDoctorName() { return assignedDoctorName; }
     public void setAssignedDoctorName(String assignedDoctorName) { this.assignedDoctorName = assignedDoctorName; }
-
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
-
-    public List<String> getPatientIds() { return patientIds; }
-    public void setPatientIds(List<String> patientIds) { this.patientIds = patientIds; }
 
     @Override
     public String toString() {

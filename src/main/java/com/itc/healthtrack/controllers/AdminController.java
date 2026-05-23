@@ -293,7 +293,7 @@ public class AdminController {
         dp.setHeader(null);
         dp.setGraphic(null);
         dp.getButtonTypes().add(ButtonType.CLOSE);
-        applyWhiteDialogStyle(dp);
+        DialogUtils.applyWhiteStyle(dp);
 
         dialog.showAndWait();
     }
@@ -380,7 +380,7 @@ public class AdminController {
             blocked.setHeaderText("El Dr. " + doctorName + " tiene " + patients.size() + " paciente(s) asignado(s)");
             blocked.setContentText("No hay otros médicos disponibles para recibir los pacientes.\n"
                     + "Registra al menos un médico más antes de intentar esta eliminación.");
-            applyWhiteDialogStyle(blocked.getDialogPane());
+            DialogUtils.applyWhiteStyle(blocked.getDialogPane());
             blocked.showAndWait();
             lblStatus.setText("Eliminación cancelada: no hay médicos disponibles para reasignación.");
             lblStatus.setTextFill(Color.web("#ff9800"));
@@ -418,7 +418,7 @@ public class AdminController {
         dialog.setHeaderText("Reasignar pacientes antes de eliminar al médico");
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-        applyWhiteDialogStyle(dialog.getDialogPane());
+        DialogUtils.applyWhiteStyle(dialog.getDialogPane());
 
         dialog.showAndWait().ifPresent(btn -> {
             if (btn != ButtonType.OK) return;
@@ -481,7 +481,7 @@ public class AdminController {
         confirm.setTitle("Confirmar eliminación");
         confirm.setHeaderText("Eliminar al Dr. " + doctorName);
         confirm.setContentText("Este médico no tiene pacientes asignados.\n¿Confirmas la eliminación?");
-        applyWhiteDialogStyle(confirm.getDialogPane());
+        DialogUtils.applyWhiteStyle(confirm.getDialogPane());
 
         confirm.showAndWait().ifPresent(result -> {
             if (result != ButtonType.OK) return;
@@ -517,7 +517,7 @@ public class AdminController {
         confirm.setTitle("Confirmar eliminación");
         confirm.setHeaderText("Eliminar usuario");
         confirm.setContentText("¿Eliminar al usuario " + userName + "?\n\nEsta acción no se puede deshacer.");
-        applyWhiteDialogStyle(confirm.getDialogPane());
+        DialogUtils.applyWhiteStyle(confirm.getDialogPane());
 
         confirm.showAndWait().ifPresent(result -> {
             if (result != ButtonType.OK) return;
@@ -565,7 +565,7 @@ public class AdminController {
         dialog.setTitle("Cambiar Rol");
         dialog.setHeaderText("Usuario: " + selectedUser.getFirstName() + " " + selectedUser.getLastName());
         dialog.setContentText("Selecciona el nuevo rol:");
-        applyWhiteDialogStyle(dialog.getDialogPane());
+        DialogUtils.applyWhiteStyle(dialog.getDialogPane());
 
         // Si el usuario elige un nuevo rol
         dialog.showAndWait().ifPresent(newRoleLabel -> {
@@ -642,10 +642,12 @@ public class AdminController {
 
                     // Pre-seleccionamos al médico actual del paciente si ya tiene uno
                     if (selectedUser.getAssignedDoctorId() != null) {
-                        doctors.stream()
-                               .filter(d -> selectedUser.getAssignedDoctorId().equals(d.getUid()))
-                               .findFirst()
-                               .ifPresent(comboDoc::setValue);
+                        for (User d : doctors) {
+                            if (selectedUser.getAssignedDoctorId().equals(d.getUid())) {
+                                comboDoc.setValue(d);
+                                break;
+                            }
+                        }
                     }
 
                     VBox content = new VBox(10,
@@ -662,7 +664,7 @@ public class AdminController {
                     dialog.setHeaderText("Asignación de médico al paciente");
                     dialog.getDialogPane().setContent(content);
                     dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-                    applyWhiteDialogStyle(dialog.getDialogPane());
+                    DialogUtils.applyWhiteStyle(dialog.getDialogPane());
 
                     dialog.showAndWait().ifPresent(btn -> {
                         if (btn != ButtonType.OK) return;
@@ -722,11 +724,6 @@ public class AdminController {
         lblTotalUsers.setText(String.valueOf(usersObservableList.size()));
         lblTotalDoctors.setText(String.valueOf(totalDoctors));
         lblTotalPatients.setText(String.valueOf(totalPatients));
-    }
-
-    // Delega el estilo de diálogos a DialogUtils para no duplicar código
-    private void applyWhiteDialogStyle(DialogPane dp) {
-        DialogUtils.applyWhiteStyle(dp);
     }
 
 }

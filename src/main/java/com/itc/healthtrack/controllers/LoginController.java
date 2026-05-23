@@ -108,31 +108,15 @@ public class LoginController {
 
         new Thread(() -> {
             try {
-                // ── Paso 1: autenticar con Firebase Auth REST API ──────────
+                // Paso 1: autenticar con Firebase Auth REST API
                 String localId = signInWithEmailAndPassword(email, password);
 
-                // ── Paso 2: obtener perfil de Firestore ────────────────────
-                User currentUser;
-                try {
-                    currentUser = userDAO.getById(localId);
-                } catch (Exception firestoreEx) {
-                    System.err.println("[LoginController] Error al leer perfil de Firestore ("
-                            + firestoreEx.getClass().getSimpleName() + "): " + firestoreEx.getMessage());
-                    firestoreEx.printStackTrace();
-                    Platform.runLater(() -> {
-                        showError("Autenticación correcta, pero no se pudo cargar el perfil. Intenta de nuevo.");
-                        loginButton.setDisable(false);
-                    });
-                    return;
-                }
+                // Paso 2: obtener perfil de Firestore (devuelve null si falla y avisa al usuario)
+                User currentUser = loadProfileSafely(localId, loginButton);
+                if (currentUser == null) return;
 
                 Platform.runLater(() -> {
                     loginButton.setDisable(false);
-
-                    if (currentUser == null) {
-                        showError("Perfil no encontrado. Contacta al administrador.");
-                        return;
-                    }
 
                     String role = currentUser.getRole() != null ? currentUser.getRole() : "patient";
 
@@ -149,18 +133,12 @@ public class LoginController {
                 });
 
             } catch (FirebaseLoginException loginError) {
-                Platform.runLater(() -> {
-                    showError(loginError.getMessage());
-                    loginButton.setDisable(false);
-                });
+                showLoginError(loginButton, loginError.getMessage());
             } catch (Exception generalError) {
                 System.err.println("[LoginController] Error inesperado ("
                         + generalError.getClass().getSimpleName() + "): " + generalError.getMessage());
                 generalError.printStackTrace();
-                Platform.runLater(() -> {
-                    showError("Error de conexión. Verifica tu red e inténtalo de nuevo.");
-                    loginButton.setDisable(false);
-                });
+                showLoginError(loginButton, "Error de conexión. Verifica tu red e inténtalo de nuevo.");
             }
         }).start();
     }
@@ -190,28 +168,12 @@ public class LoginController {
                 // autenticar con Firebase Auth REST API
                 String localId = signInWithEmailAndPassword(email, password);
 
-                // obtener perfil de Firestore
-                User currentUser;
-                try {
-                    currentUser = userDAO.getById(localId);
-                } catch (Exception firestoreEx) {
-                    System.err.println("[LoginController] Error al leer perfil de Firestore ("
-                            + firestoreEx.getClass().getSimpleName() + "): " + firestoreEx.getMessage());
-                    firestoreEx.printStackTrace();
-                    Platform.runLater(() -> {
-                        showError("Autenticación correcta, pero no se pudo cargar el perfil. Intenta de nuevo.");
-                        doctorLoginButton.setDisable(false);
-                    });
-                    return;
-                }
+                // obtener perfil de Firestore (devuelve null si falla y avisa al usuario)
+                User currentUser = loadProfileSafely(localId, doctorLoginButton);
+                if (currentUser == null) return;
 
                 Platform.runLater(() -> {
                     doctorLoginButton.setDisable(false);
-
-                    if (currentUser == null) {
-                        showError("Perfil no encontrado. Contacta al administrador.");
-                        return;
-                    }
 
                     if (!"doctor".equals(currentUser.getRole())) {
                         showError("Esta cuenta no tiene rol de médico en el sistema.");
@@ -222,18 +184,12 @@ public class LoginController {
                 });
 
             } catch (FirebaseLoginException loginError) {
-                Platform.runLater(() -> {
-                    showError(loginError.getMessage());
-                    doctorLoginButton.setDisable(false);
-                });
+                showLoginError(doctorLoginButton, loginError.getMessage());
             } catch (Exception generalError) {
                 System.err.println("[LoginController] Error inesperado ("
                         + generalError.getClass().getSimpleName() + "): " + generalError.getMessage());
                 generalError.printStackTrace();
-                Platform.runLater(() -> {
-                    showError("Error de conexión. Verifica tu red e inténtalo de nuevo.");
-                    doctorLoginButton.setDisable(false);
-                });
+                showLoginError(doctorLoginButton, "Error de conexión. Verifica tu red e inténtalo de nuevo.");
             }
         }).start();
     }
@@ -399,6 +355,40 @@ public class LoginController {
     private void showError(String message) {
         errorLabel.setText(message);
         errorLabel.setVisible(true);
+    }
+
+    // Carga el perfil del usuario desde Firestore tras autenticar.
+    // Si el documento no existe o ocurre un error, muestra el aviso al usuario,
+    // reactiva el botón de inicio de sesión y devuelve null.
+    private User loadProfileSafely(String uid, Button button) {
+        try {
+            User profile = userDAO.getById(uid);
+            if (profile == null) {
+                Platform.runLater(() -> {
+                    showError("Perfil no encontrado. Contacta al administrador.");
+                    button.setDisable(false);
+                });
+            }
+            return profile;
+        } catch (Exception ex) {
+            System.err.println("[LoginController] Error al leer perfil de Firestore ("
+                    + ex.getClass().getSimpleName() + "): " + ex.getMessage());
+            ex.printStackTrace();
+            Platform.runLater(() -> {
+                showError("Autenticación correcta, pero no se pudo cargar el perfil. Intenta de nuevo.");
+                button.setDisable(false);
+            });
+            return null;
+        }
+    }
+
+    // Muestra un mensaje de error y reactiva el botón en el hilo de la interfaz.
+    // Centraliza el patrón usado en los dos flujos de inicio de sesión.
+    private void showLoginError(Button button, String message) {
+        Platform.runLater(() -> {
+            showError(message);
+            button.setDisable(false);
+        });
     }
 
     // Excepción interna: distingue errores de Auth (mensaje conocido) de errores de red

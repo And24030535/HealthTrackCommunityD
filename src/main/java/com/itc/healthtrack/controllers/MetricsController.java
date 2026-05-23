@@ -208,32 +208,23 @@ public class MetricsController {
 
     //Calcula y muestra los promedios de presión arterial, glucosa y peso para el período de datos actualmente visible
     private void calculateAverages(List<Metric> data) {
-        if (data.isEmpty()) {
+        // Delegamos el cálculo a MetricUtils — sólo armamos las etiquetas con el resultado
+        MetricUtils.Averages avg = MetricUtils.computeAverages(data);
+
+        if (avg.systolicAvg != null && avg.diastolicAvg != null) {
+            // Mostramos la presión como enteros (mmHg no usa decimales en la práctica clínica)
+            lblAvgBP.setText("PA: " + avg.systolicAvg.intValue() + "/" + avg.diastolicAvg.intValue() + " mmHg");
+        } else {
             lblAvgBP.setText("PA: --/-- mmHg");
-            lblAvgGlucose.setText("Glucosa: -- mg/dL");
-            lblAvgWeight.setText("Peso: -- kg");
-            return;
         }
 
-        // Sumar todos los valores
-        int sysTotal = 0, diaTotal = 0, bpCount = 0;
-        double glTotal = 0, weightTotal = 0;
-        int glCount = 0, weightCount = 0;
+        lblAvgGlucose.setText(avg.glucoseAvg != null
+                ? String.format("Glucosa: %.1f mg/dL", avg.glucoseAvg)
+                : "Glucosa: -- mg/dL");
 
-        for (Metric m : data) {
-            if (m.getSystolic() != null && m.getDiastolic() != null) {
-                sysTotal += m.getSystolic();
-                diaTotal += m.getDiastolic();
-                bpCount++;
-            }
-            if (m.getGlucoseLevel() != null) { glTotal += m.getGlucoseLevel(); glCount++; }
-            if (m.getWeight() != null) { weightTotal += m.getWeight(); weightCount++; }
-        }
-
-        // Mostrar promedios calculados
-        lblAvgBP.setText(bpCount > 0 ? "PA: " + (sysTotal/bpCount) + "/" + (diaTotal/bpCount) + " mmHg" : "PA: --/-- mmHg");
-        lblAvgGlucose.setText(glCount > 0 ? String.format("Glucosa: %.1f mg/dL", (glTotal/glCount)) : "Glucosa: -- mg/dL");
-        lblAvgWeight.setText(weightCount > 0 ? String.format("Peso: %.1f kg", (weightTotal/weightCount)) : "Peso: -- kg");
+        lblAvgWeight.setText(avg.weightAvg != null
+                ? String.format("Peso: %.1f kg", avg.weightAvg)
+                : "Peso: -- kg");
     }
 
     /*Actualiza el gráfico de línea con la evolución de presión arterial.
@@ -270,25 +261,13 @@ public class MetricsController {
         XYChart.Series<String, Number> avgSeries = new XYChart.Series<>();
         avgSeries.setName("Promedio del período");
 
-        // Calcular promedios de todas las métricas
-        int sysTotal = 0, diaTotal = 0, hrTotal = 0;
-        double glTotal = 0, weightTotal = 0;
-        int sysCount = 0, diaCount = 0, hrCount = 0, glCount = 0, weightCount = 0;
-
-        for (Metric m : history) {
-            if (m.getSystolic() != null)     { sysTotal    += m.getSystolic();    sysCount++;    }
-            if (m.getDiastolic() != null)    { diaTotal    += m.getDiastolic();   diaCount++;    }
-            if (m.getHeartRate() != null)    { hrTotal     += m.getHeartRate();   hrCount++;     }
-            if (m.getGlucoseLevel() != null) { glTotal     += m.getGlucoseLevel(); glCount++;   }
-            if (m.getWeight() != null)       { weightTotal += m.getWeight();      weightCount++; }
-        }
-
-        // Agregar al gráfico los promedios calculados
-        if (sysCount > 0)    avgSeries.getData().add(new XYChart.Data<>("Sistólica",  sysTotal    / (double) sysCount));
-        if (diaCount > 0)    avgSeries.getData().add(new XYChart.Data<>("Diastólica", diaTotal    / (double) diaCount));
-        if (hrCount > 0)     avgSeries.getData().add(new XYChart.Data<>("F. Cardíaca", hrTotal    / (double) hrCount));
-        if (glCount > 0)     avgSeries.getData().add(new XYChart.Data<>("Glucosa",    glTotal     / (double) glCount));
-        if (weightCount > 0) avgSeries.getData().add(new XYChart.Data<>("Peso (kg)",  weightTotal / (double) weightCount));
+        // Delegamos el conteo y suma a MetricUtils — sólo agregamos al gráfico los promedios con dato
+        MetricUtils.Averages avg = MetricUtils.computeAverages(history);
+        if (avg.systolicAvg  != null) avgSeries.getData().add(new XYChart.Data<>("Sistólica",   avg.systolicAvg));
+        if (avg.diastolicAvg != null) avgSeries.getData().add(new XYChart.Data<>("Diastólica",  avg.diastolicAvg));
+        if (avg.heartRateAvg != null) avgSeries.getData().add(new XYChart.Data<>("F. Cardíaca", avg.heartRateAvg));
+        if (avg.glucoseAvg   != null) avgSeries.getData().add(new XYChart.Data<>("Glucosa",     avg.glucoseAvg));
+        if (avg.weightAvg    != null) avgSeries.getData().add(new XYChart.Data<>("Peso (kg)",   avg.weightAvg));
 
         averagesChart.getData().add(avgSeries);
     }
