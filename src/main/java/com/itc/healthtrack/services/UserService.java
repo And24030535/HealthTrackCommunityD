@@ -6,16 +6,6 @@ import com.itc.healthtrack.models.User;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Servicio para operaciones de usuario que requieren lógica de negocio.
- *
- * Antes, MetricsController, RecommendationsController, ReportsController
- * y PatientsController tenían cada uno su propia copia del mismo método
- * getPatientsForUser(). Esta clase centraliza esa lógica.
- *
- * Respeta la arquitectura MVC+DAO: usa GenericDAO para acceder a Firestore
- * y no contiene referencias a la interfaz gráfica.
- */
 public class UserService {
 
     // DAO para acceder a la colección "users" en Firestore
