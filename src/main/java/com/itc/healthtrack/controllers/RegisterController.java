@@ -193,9 +193,14 @@ public class RegisterController {
 
                 // Éxito — mostrar confirmación y redirigir al login
                 Platform.runLater(() -> {
-                    String displayRole = "doctor".equals(mappedRole) ? "Doctor"
-                                       : "admin".equals(mappedRole)  ? "Administrador"
-                                       : "Paciente";
+                    String displayRole;
+                    if ("doctor".equals(mappedRole)) {
+                        displayRole = "Doctor";
+                    } else if ("admin".equals(mappedRole)) {
+                        displayRole = "Administrador";
+                    } else {
+                        displayRole = "Paciente";
+                    }
                     showStatus("¡Cuenta creada como " + displayRole + "! Redirigiendo al login...", true);
                     btnRegister.setDisable(false);
                     new Thread(() -> {

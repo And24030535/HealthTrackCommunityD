@@ -10,7 +10,9 @@ import com.itc.healthtrack.models.Recommendation;
 import com.itc.healthtrack.models.User;
 import com.itc.healthtrack.services.NotificationService;
 import com.itc.healthtrack.services.UserService;
+import com.itc.healthtrack.utils.AlertUtils;
 import com.itc.healthtrack.utils.MetricUtils;
+import com.itc.healthtrack.utils.RecommendationUtils;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -39,7 +41,6 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 // Controlador para la gestión de recomendaciones clínicas
@@ -196,20 +197,9 @@ public class RecommendationsController {
                     }
                 }
 
-                // Ordenar análisis de más reciente a más antiguo
-                Collections.sort(analyses, (a, b) -> {
-                    if (a.getGeneratedAt() == null && b.getGeneratedAt() == null) return 0;
-                    if (a.getGeneratedAt() == null) return 1;
-                    if (b.getGeneratedAt() == null) return -1;
-                    return b.getGeneratedAt().compareTo(a.getGeneratedAt());
-                });
-
-                // Ordenar notas de más reciente a más antigua
-                Collections.sort(notes, (a, b) -> {
-                    if (a.getGeneratedAt() == null) return 1;
-                    if (b.getGeneratedAt() == null) return -1;
-                    return b.getGeneratedAt().compareTo(a.getGeneratedAt());
-                });
+                // Ordenamos ambas listas de la más reciente a la más antigua
+                RecommendationUtils.sortByDateDesc(analyses);
+                RecommendationUtils.sortByDateDesc(notes);
 
                 Platform.runLater(() -> {
                     historyItems.clear();
@@ -826,7 +816,7 @@ public class RecommendationsController {
                 // Recopilar todos los datos necesarios para las tres hojas
                 List<Metric>         metricas = getMetricsByPatient(selected.getUid());
                 List<Recommendation> recs     = getRecommendationsByPatient(selected.getUid());
-                String               alertas  = buildAlertsText(metricas);
+                String               alertas  = AlertUtils.buildAlertsText(metricas);
 
                 // Generar y guardar el archivo Excel
                 generateExcel(archivo, diagnostico, alertas, metricas, recs);
@@ -860,70 +850,8 @@ public class RecommendationsController {
         for (Recommendation r : todas) {
             if (!"note".equals(r.getType())) analisis.add(r);
         }
-        Collections.sort(analisis, (a, b) -> {
-            if (a.getGeneratedAt() == null && b.getGeneratedAt() == null) return 0;
-            if (a.getGeneratedAt() == null) return 1;
-            if (b.getGeneratedAt() == null) return -1;
-            return b.getGeneratedAt().compareTo(a.getGeneratedAt());
-        });
+        RecommendationUtils.sortByDateDesc(analisis);
         return analisis;
-    }
-
-    // Construye un texto con las alertas activas a partir de la última métrica del paciente.
-    // Evalúa: presión arterial, glucosa, frecuencia cardíaca e IMC con los mismos umbrales
-    // que usa generateAlgorithmicRecommendations(), para garantizar consistencia.
-    private String buildAlertsText(List<Metric> metricas) {
-        if (metricas == null || metricas.isEmpty()) return "Sin datos de métricas disponibles.";
-        Metric ultima = metricas.get(0); // Lista ya ordenada de más reciente a más antigua
-        StringBuilder sb = new StringBuilder();
-
-        // Presión arterial
-        if (ultima.getSystolic() != null && ultima.getDiastolic() != null) {
-            int sys = ultima.getSystolic(), dia = ultima.getDiastolic();
-            if (sys >= 180 || dia >= 120)
-                sb.append("• CRÍTICO — Hipertensión en crisis (")
-                  .append(sys).append("/").append(dia).append(" mmHg)\n");
-            else if (sys >= 140 || dia >= 90)
-                sb.append("• ALERTA — Hipertensión (")
-                  .append(sys).append("/").append(dia).append(" mmHg)\n");
-            else if (sys >= 130 || dia >= 80)
-                sb.append("• AVISO — Prehipertensión (")
-                  .append(sys).append("/").append(dia).append(" mmHg)\n");
-        }
-
-        // Glucosa
-        if (ultima.getGlucoseLevel() != null) {
-            double gluc = ultima.getGlucoseLevel();
-            if (gluc > 300)
-                sb.append("• CRÍTICO — Glucosa extrema (")
-                  .append(gluc).append(" mg/dL) — riesgo de cetoacidosis\n");
-            else if (gluc > 125)
-                sb.append("• ALERTA — Hiperglucemia (").append(gluc).append(" mg/dL)\n");
-            else if (gluc < 70)
-                sb.append("• ALERTA — Hipoglucemia (").append(gluc).append(" mg/dL)\n");
-        }
-
-        // Frecuencia cardíaca
-        if (ultima.getHeartRate() != null) {
-            int hr = ultima.getHeartRate();
-            if (hr > 120)
-                sb.append("• ALERTA — Taquicardia (").append(hr).append(" lpm)\n");
-            else if (hr < 50)
-                sb.append("• ALERTA — Bradicardia (").append(hr).append(" lpm)\n");
-        }
-
-        // IMC
-        if (ultima.getBmi() != null) {
-            double bmi = ultima.getBmi();
-            if (bmi >= 35)
-                sb.append("• ALERTA — Obesidad severa (IMC: ").append(bmi).append(")\n");
-            else if (bmi >= 30)
-                sb.append("• AVISO — Obesidad Clase I (IMC: ").append(bmi).append(")\n");
-            else if (bmi < 18.5)
-                sb.append("• AVISO — Bajo peso (IMC: ").append(bmi).append(")\n");
-        }
-
-        return sb.length() > 0 ? sb.toString().trim() : "No se detectaron alertas activas.";
     }
 
     // Genera el archivo Excel con tres hojas:
