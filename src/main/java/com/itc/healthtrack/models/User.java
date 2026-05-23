@@ -83,15 +83,6 @@ public class User {
     public String getAssignedDoctorName() { return assignedDoctorName; }
     public void setAssignedDoctorName(String assignedDoctorName) { this.assignedDoctorName = assignedDoctorName; }
 
-    // BeanMapper construye su mapa de propiedades a partir de los GETTERS.
-    // Sin getter, el setter correspondiente es ignorado y el warning persiste.
-    // Solución: agregar ambos. El getter devuelve null para no escribir datos obsoletos en Firestore.
-    public String getPassword() { return null; }
-    public void   setPassword(String password) {} // no-op: contraseña vive en Firebase Auth, no en Firestore
-
-    public java.util.List<String> getPatientIds() { return null; }
-    public void setPatientIds(java.util.List<String> patientIds) {} // no-op: campo obsoleto
-
     @Override
     public String toString() {
         return this.firstName + " " + this.lastName;

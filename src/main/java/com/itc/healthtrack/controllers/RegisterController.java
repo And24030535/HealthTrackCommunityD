@@ -2,8 +2,10 @@ package com.itc.healthtrack.controllers;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.UserRecord;
+import com.itc.healthtrack.config.AppConfig;
 import com.itc.healthtrack.dao.GenericDAO;
 import com.itc.healthtrack.models.User;
+import com.itc.healthtrack.utils.DialogUtils;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -36,11 +38,7 @@ import java.util.List;
  */
 public class RegisterController {
 
-    // -------------------------------------------------------------------
-    // Tokens de seguridad  (en producción vendrían de un backend seguro)
-    // -------------------------------------------------------------------
-    private static final String TOKEN_DOCTOR = "DOCTOR-2026";
-    private static final String TOKEN_ADMIN  = "ADMIN-TRACK-2026";
+    // Los tokens de seguridad están centralizados en AppConfig para evitar duplicación
 
     // -------------------------------------------------------------------
     // Campos del formulario — deben coincidir con fx:id en register-view.fxml
@@ -137,7 +135,7 @@ public class RegisterController {
                         + "Solicítalo al administrador del sistema.");
                 return;
             }
-            if (!TOKEN_DOCTOR.equals(tokenInput)) {
+            if (!AppConfig.TOKEN_DOCTOR.equals(tokenInput)) {
                 showTokenAlert("Código de acceso médico incorrecto.\n"
                         + "Verifica el código e intenta de nuevo.");
                 return;
@@ -148,7 +146,7 @@ public class RegisterController {
                         + "Solicítalo al administrador principal del sistema.");
                 return;
             }
-            if (!TOKEN_ADMIN.equals(tokenInput)) {
+            if (!AppConfig.TOKEN_ADMIN.equals(tokenInput)) {
                 showTokenAlert("Código maestro de administrador incorrecto.\n"
                         + "Verifica el código e intenta de nuevo.");
                 return;
@@ -252,7 +250,7 @@ public class RegisterController {
     }
 
     // -------------------------------------------------------------------
-    // Alerta de token inválido — dialog blanco para consistencia visual
+    // Alerta de token inválido — usa DialogUtils para estilo uniforme
     // -------------------------------------------------------------------
 
     private void showTokenAlert(String message) {
@@ -260,23 +258,7 @@ public class RegisterController {
         alert.setTitle("Código de Acceso Requerido");
         alert.setHeaderText("Verificación de seguridad fallida");
         alert.setContentText(message);
-
-        DialogPane dp = alert.getDialogPane();
-        dp.setStyle("-fx-background-color: #ffffff; -fx-font-size: 13px;");
-        javafx.scene.Node content = dp.lookup(".content.label");
-        if (content != null) content.setStyle("-fx-text-fill: #222222;");
-        javafx.scene.Node header = dp.lookup(".header-panel");
-        if (header != null) header.setStyle("-fx-background-color: #fff3e0;");
-        javafx.scene.Node headerLabel = dp.lookup(".header-panel .label");
-        if (headerLabel != null) headerLabel.setStyle("-fx-text-fill: #e65100; -fx-font-weight: bold;");
-        for (ButtonType bt : dp.getButtonTypes()) {
-            javafx.scene.Node node = dp.lookupButton(bt);
-            if (node instanceof Button) {
-                ((Button) node).setStyle(
-                        "-fx-background-color: #ff9800; -fx-text-fill: #ffffff;"
-                        + " -fx-cursor: hand; -fx-padding: 6 22; -fx-background-radius: 4;");
-            }
-        }
+        DialogUtils.applyWhiteStyle(alert.getDialogPane());
         alert.showAndWait();
     }
 

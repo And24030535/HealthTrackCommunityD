@@ -2,6 +2,7 @@ package com.itc.healthtrack.controllers;
 
 import com.itc.healthtrack.dao.GenericDAO;
 import com.itc.healthtrack.models.User;
+import com.itc.healthtrack.utils.DialogUtils;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -201,12 +202,11 @@ public class AdminController {
 
         // Convierte el rol del ComboBox al valor de la BD
         String roleValue = getRoleValue(roleFilter);
-        String finalRoleValue = roleValue;
 
         // Establece la condición de filtro
         filteredList.setPredicate(user -> {
             // Verifica que el rol coincida (o si está marcado "Todos")
-            boolean roleMatch = "Todos".equals(roleFilter) || finalRoleValue.equals(user.getRole());
+            boolean roleMatch = "Todos".equals(roleFilter) || roleValue.equals(user.getRole());
 
             // Verifica que el texto sea encontrado en nombre, apellido o correo
             boolean textMatch = keyword.isEmpty()
@@ -448,9 +448,18 @@ public class AdminController {
                     userDao.delete(doctorId);
 
                     Platform.runLater(() -> {
+                        // Actualizar la lista local sin recargar todo desde Firestore
+                        for (User p : patients) {
+                            p.setAssignedDoctorId(nuevoMedico.getUid());
+                            p.setAssignedDoctorName(
+                                    nuevoMedico.getFirstName() + " " + nuevoMedico.getLastName());
+                        }
+                        usersObservableList.removeIf(u -> doctorId.equals(u.getUid()));
+                        tableUsers.refresh();
                         selectedUser = null;
                         tableUsers.getSelectionModel().clearSelection();
-                        loadAllUsers();
+                        refreshStats();
+                        applyFilter();
                         lblStatus.setText(patients.size() + " paciente(s) reasignado(s) al Dr. "
                                 + nuevoMedico.getLastName() + ". Médico eliminado correctamente.");
                         lblStatus.setTextFill(Color.web("#4caf50"));
@@ -480,9 +489,13 @@ public class AdminController {
                 try {
                     userDao.delete(doctorId);
                     Platform.runLater(() -> {
+                        // Eliminar al médico de la lista local sin recargar Firestore
+                        usersObservableList.removeIf(u -> doctorId.equals(u.getUid()));
+                        tableUsers.refresh();
                         selectedUser = null;
                         tableUsers.getSelectionModel().clearSelection();
-                        loadAllUsers();
+                        refreshStats();
+                        applyFilter();
                         lblStatus.setText("Médico eliminado correctamente.");
                         lblStatus.setTextFill(Color.web("#4caf50"));
                     });
@@ -515,9 +528,13 @@ public class AdminController {
                 try {
                     userDao.delete(userId);
                     Platform.runLater(() -> {
+                        // Eliminar al usuario de la lista local sin recargar Firestore
+                        usersObservableList.removeIf(u -> userId.equals(u.getUid()));
+                        tableUsers.refresh();
                         selectedUser = null;
                         tableUsers.getSelectionModel().clearSelection();
-                        loadAllUsers();
+                        refreshStats();
+                        applyFilter();
                         lblStatus.setText("Usuario eliminado correctamente.");
                         lblStatus.setTextFill(Color.web("#4caf50"));
                     });
@@ -562,7 +579,10 @@ public class AdminController {
                     selectedUser.setRole(newRole);
                     userDao.save(selectedUser.getUid(), selectedUser);
                     Platform.runLater(() -> {
-                        loadAllUsers();  // Recarga la tabla
+                        // Actualizar el rol en la lista local sin recargar Firestore
+                        tableUsers.refresh();
+                        refreshStats();
+                        applyFilter();
                         lblStatus.setText("Rol actualizado a: " + newRoleLabel); // Muestra en español
                         lblStatus.setTextFill(Color.web("#4caf50"));
                     });
@@ -658,7 +678,9 @@ public class AdminController {
                             try {
                                 userDao.save(selectedUser.getUid(), selectedUser);
                                 Platform.runLater(() -> {
-                                    loadAllUsers();
+                                    // Actualizar el nombre del médico en la lista local sin recargar Firestore
+                                    tableUsers.refresh();
+                                    applyFilter();
                                     lblStatus.setText("Médico asignado correctamente: Dr. " + chosenDoctor.getLastName());
                                     lblStatus.setTextFill(Color.web("#4caf50"));
                                 });
@@ -682,40 +704,29 @@ public class AdminController {
         }).start();
     }
 
-    // Obtiene la lista de pacientes asignados a un médico específico
+    // Obtiene la lista de pacientes asignados a un médico específico.
+    // Usa la consulta directa por campo en lugar de cargar todos y filtrar en memoria.
     private List<User> getPatientsByDoctorId(String doctorId) throws Exception {
-        // Lista final de pacientes asignados
-        List<User> result = new ArrayList<>();
-        // Consulta todos los usuarios con rol de paciente
-        List<User> patients = userDao.getByField("role", "patient");
-        // Recorre cada paciente para validar el médico asignado
-        for (User patient : patients) {
-            if (doctorId != null && doctorId.equals(patient.getAssignedDoctorId())) {
-                result.add(patient);
-            }
-        }
-        // Devuelve la lista filtrada
-        return result;
+        return userDao.getByField("assignedDoctorId", doctorId);
     }
 
-    private void applyWhiteDialogStyle(DialogPane dp) {
-        dp.setStyle("-fx-background-color: #ffffff; -fx-font-size: 13px;");
-        javafx.scene.Node content = dp.lookup(".content.label");
-        if (content != null) content.setStyle("-fx-text-fill: #222222; -fx-font-size: 13px;");
-        javafx.scene.Node header = dp.lookup(".header-panel");
-        if (header != null) header.setStyle("-fx-background-color: #f5f5f5;");
-        javafx.scene.Node headerLabel = dp.lookup(".header-panel .label");
-        if (headerLabel != null) headerLabel.setStyle("-fx-text-fill: #111111; -fx-font-weight: bold;");
-        for (ButtonType bt : dp.getButtonTypes()) {
-            javafx.scene.Node node = dp.lookupButton(bt);
-            if (node instanceof Button) {
-                Button btn = (Button) node;
-                boolean cancel = (bt == ButtonType.CANCEL || bt == ButtonType.NO || bt == ButtonType.CLOSE);
-                btn.setStyle("-fx-background-color: " + (cancel ? "#9e9e9e" : "#2196f3") +
-                        "; -fx-text-fill: #ffffff; -fx-cursor: hand;" +
-                        " -fx-padding: 6 22; -fx-background-radius: 4;");
-            }
+    // Recalcula las etiquetas de estadísticas a partir de la lista observable actual,
+    // sin hacer ninguna consulta adicional a Firestore.
+    private void refreshStats() {
+        int totalDoctors  = 0;
+        int totalPatients = 0;
+        for (User u : usersObservableList) {
+            if ("doctor".equals(u.getRole()))  totalDoctors++;
+            if ("patient".equals(u.getRole())) totalPatients++;
         }
+        lblTotalUsers.setText(String.valueOf(usersObservableList.size()));
+        lblTotalDoctors.setText(String.valueOf(totalDoctors));
+        lblTotalPatients.setText(String.valueOf(totalPatients));
+    }
+
+    // Delega el estilo de diálogos a DialogUtils para no duplicar código
+    private void applyWhiteDialogStyle(DialogPane dp) {
+        DialogUtils.applyWhiteStyle(dp);
     }
 
 }

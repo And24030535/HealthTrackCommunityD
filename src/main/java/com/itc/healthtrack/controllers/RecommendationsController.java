@@ -9,6 +9,8 @@ import com.itc.healthtrack.models.Metric;
 import com.itc.healthtrack.models.Recommendation;
 import com.itc.healthtrack.models.User;
 import com.itc.healthtrack.services.NotificationService;
+import com.itc.healthtrack.services.UserService;
+import com.itc.healthtrack.utils.MetricUtils;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -56,8 +58,6 @@ public class RecommendationsController {
 
     // Sección de notas médicas (médico escribe, paciente/admin solo lee)
     @FXML private VBox     notesSection;
-    @FXML private Label    lblNotesTitle;
-    @FXML private Label    lblNotesSubtitle;
     @FXML private VBox     noteWriteSection;  // Solo visible para médicos
     @FXML private TextArea txtNoteInput;       // Campo de escritura de notas
     @FXML private VBox     vboxNotesList;      // Contenedor dinámico: un bloque visual por cada nota
@@ -73,6 +73,7 @@ public class RecommendationsController {
     private final GenericDAO<Recommendation> recommendationDAO = new GenericDAO<>(Recommendation.class, "recommendations");
 
     private final NotificationService notificationService = new NotificationService();
+    private final UserService userService = new UserService();
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10)).build();
 
@@ -101,41 +102,21 @@ public class RecommendationsController {
                 noteWriteSection.setManaged(false);
             }
             String uid = doctor.getUid() != null ? doctor.getUid() : "";
-            loadRecommendationHistory(uid);
-            showNotesSection("Notas de tu Médico", "Mensajes personalizados de tu médico tratante");
-            loadDoctorNotes(uid);
+            loadAllRecommendationsForPatient(uid);
 
         } else {
             loadPatients();
             comboPatients.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
                 if (newVal != null) {
                     historyItems.clear();
-                    loadRecommendationHistory(newVal.getUid());
+                    loadAllRecommendationsForPatient(newVal.getUid());
 
-                    if ("doctor".equals(loggedInDoctor.getRole())) {
-                        // El médico puede leer y escribir notas
-                        showNotesSection(
-                                "Notas Médicas: " + newVal.getFirstName() + " " + newVal.getLastName(),
-                                "Historial de notas clínicas para este paciente"
-                        );
-                        // Mostramos el área de escritura solo para el médico
-                        if (noteWriteSection != null) {
-                            noteWriteSection.setVisible(true);
-                            noteWriteSection.setManaged(true);
-                        }
-                        loadDoctorNotes(newVal.getUid());
-
-                    } else if ("admin".equals(loggedInDoctor.getRole())) {
-                        // El admin solo puede leer notas — ocultamos el área de escritura
-                        showNotesSection(
-                                "Notas Médicas: " + newVal.getFirstName() + " " + newVal.getLastName(),
-                                "Notas clínicas registradas por el médico de este paciente"
-                        );
-                        if (noteWriteSection != null) {
-                            noteWriteSection.setVisible(false);
-                            noteWriteSection.setManaged(false);
-                        }
-                        loadDoctorNotes(newVal.getUid());
+                    // El médico puede leer y escribir notas; el admin solo puede leer
+                    boolean isDoctor = "doctor".equals(loggedInDoctor.getRole());
+                    showNotesSection();
+                    if (noteWriteSection != null) {
+                        noteWriteSection.setVisible(isDoctor);
+                        noteWriteSection.setManaged(isDoctor);
                     }
                 }
             });
@@ -173,32 +154,23 @@ public class RecommendationsController {
     }
 
 
-    // Muestra la sección de notas médicas con el título y subtítulo indicados
-    private void showNotesSection(String title, String subtitle) {
+    // Muestra la sección de notas médicas
+    private void showNotesSection() {
         if (notesSection != null) {
             notesSection.setVisible(true);
             notesSection.setManaged(true);
         }
-        if (lblNotesTitle != null)    lblNotesTitle.setText(title);
-        if (lblNotesSubtitle != null) lblNotesSubtitle.setText(subtitle);
     }
 
     // -------------------------------------------------------------------
     // Carga de datos
     // -------------------------------------------------------------------
 
+    // Carga la lista de pacientes usando UserService para evitar duplicar la lógica de filtrado
     private void loadPatients() {
         new Thread(() -> {
             try {
-                List<User> all = userDAO.getByField("role", "patient");
-                List<User> visible = new ArrayList<>();
-                for (User p : all) {
-                    if ("admin".equals(loggedInDoctor.getRole())) {
-                        visible.add(p);
-                    } else if (loggedInDoctor.getUid() != null && loggedInDoctor.getUid().equals(p.getAssignedDoctorId())) {
-                        visible.add(p);
-                    }
-                }
+                List<User> visible = userService.getPatientsForUser(loggedInDoctor);
                 Platform.runLater(() ->
                         comboPatients.setItems(FXCollections.observableArrayList(visible)));
             } catch (Exception e) {
@@ -209,51 +181,51 @@ public class RecommendationsController {
         }).start();
     }
 
-    // Carga solo los análisis clínicos (type != "note") — excluye las notas manuales del médico.
-    private void loadRecommendationHistory(String patientId) {
+    // Carga TODAS las recomendaciones del paciente en una sola consulta a Firestore,
+    // luego separa en memoria: análisis al historial y notas al panel de notas.
+    // Reemplaza las dos llamadas separadas (loadRecommendationHistory + loadDoctorNotes)
+    // que antes hacían dos queries idénticas para el mismo paciente.
+    private void loadAllRecommendationsForPatient(String patientId) {
         new Thread(() -> {
             try {
+                // Una sola consulta a Firestore — luego separamos por tipo en memoria
                 List<Recommendation> all = recommendationDAO.getByField("patientId", patientId);
-                // Tarea 4: excluir notas del médico; éstas van en su propio ListView
+
                 List<Recommendation> analyses = new ArrayList<>();
+                List<Recommendation> notes    = new ArrayList<>();
+
                 for (Recommendation r : all) {
-                    if (!"note".equals(r.getType())) analyses.add(r);
+                    if ("note".equals(r.getType())) {
+                        notes.add(r);
+                    } else {
+                        analyses.add(r);
+                    }
                 }
+
+                // Ordenar análisis de más reciente a más antiguo
                 Collections.sort(analyses, (a, b) -> {
                     if (a.getGeneratedAt() == null && b.getGeneratedAt() == null) return 0;
                     if (a.getGeneratedAt() == null) return 1;
                     if (b.getGeneratedAt() == null) return -1;
                     return b.getGeneratedAt().compareTo(a.getGeneratedAt());
                 });
-                Platform.runLater(() -> {
-                    historyItems.clear();
-                    historyItems.addAll(analyses);
-                });
-            } catch (Exception e) {
-                System.err.println("Error cargando historial de recomendaciones: " + e.getMessage());
-            }
-        }).start();
-    }
 
-    // Carga las notas manuales del médico (type="note") para el paciente dado.
-    // Al terminar llama a renderNoteBlocks() en el hilo de JavaFX para actualizar la vista.
-    private void loadDoctorNotes(String patientId) {
-        new Thread(() -> {
-            try {
-                List<Recommendation> all = recommendationDAO.getByField("patientId", patientId);
-                List<Recommendation> notes = new ArrayList<>();
-                for (Recommendation r : all) {
-                    if ("note".equals(r.getType())) notes.add(r);
-                }
-                // Ordenamos de más reciente a más antigua
+                // Ordenar notas de más reciente a más antigua
                 Collections.sort(notes, (a, b) -> {
                     if (a.getGeneratedAt() == null) return 1;
                     if (b.getGeneratedAt() == null) return -1;
                     return b.getGeneratedAt().compareTo(a.getGeneratedAt());
                 });
-                Platform.runLater(() -> renderNoteBlocks(notes));
+
+                Platform.runLater(() -> {
+                    historyItems.clear();
+                    historyItems.addAll(analyses);
+                    renderNoteBlocks(notes);
+                });
+
             } catch (Exception e) {
-                System.err.println("[RecommendationsController] Error cargando notas del médico: " + e.getMessage());
+                System.err.println("[RecommendationsController] Error cargando datos del paciente: "
+                        + e.getMessage());
             }
         }).start();
     }
@@ -392,7 +364,7 @@ public class RecommendationsController {
     // Usa GenericDAO<Metric>.getByField("patientId", patientId) — sin MetricDAO.
     private List<Metric> getMetricsByPatient(String patientId) throws Exception {
         List<Metric> metrics = metricDAO.getByField("patientId", patientId);
-        sortMetricsByTimestamp(metrics);
+        MetricUtils.sortByTimestampDesc(metrics);
         return metrics;
     }
 
@@ -421,8 +393,8 @@ public class RecommendationsController {
                 // Guarda el documento usando el ID generado
                 recommendationDAO.save(newId, rec);
 
-                // Recarga el historial para mostrar la nueva entrada
-                loadRecommendationHistory(patientId);
+                // Recarga el historial para mostrar la nueva entrada (una sola consulta)
+                loadAllRecommendationsForPatient(patientId);
 
             } catch (Exception e) {
                 System.err.println("Error guardando recomendación: " + e.getMessage());
@@ -686,24 +658,15 @@ public class RecommendationsController {
                 nota.setId(nuevoId);
                 // Aquí guardamos la nota en Firebase dentro de la colección "recommendations"
                 recommendationDAO.save(nuevoId, nota);
-                // Limpiamos el campo y recargamos la lista en el hilo de JavaFX
+                // Limpiamos el campo y recargamos con una sola consulta en el hilo de JavaFX
                 Platform.runLater(() -> {
                     txtNoteInput.clear();
-                    loadDoctorNotes(paciente.getUid());
+                    loadAllRecommendationsForPatient(paciente.getUid());
                 });
             } catch (Exception e) {
                 System.err.println("[RecommendationsController] Error al guardar nota: " + e.getMessage());
             }
         }).start();
-    }
-
-    private void sortMetricsByTimestamp(List<Metric> metrics) {
-        metrics.sort((a, b) -> {
-            if (a.getTimestamp() == null && b.getTimestamp() == null) return 0;
-            if (a.getTimestamp() == null) return 1;
-            if (b.getTimestamp() == null) return -1;
-            return b.getTimestamp().compareTo(a.getTimestamp());
-        });
     }
 
     // Parsea la respuesta JSON de USDA y extrae macronutrientes de los primeros 3 alimentos

@@ -45,11 +45,4 @@ public class Metric {
 
     public Double getGlucoseLevel() { return glucoseLevel; }
     public void setGlucoseLevel(Double glucoseLevel) { this.glucoseLevel = glucoseLevel; }
-
-    // Igual que en User — BeanMapper necesita getter+setter para registrar la propiedad.
-    public String getMetricType() { return null; }
-    public void   setMetricType(String metricType) {} // no-op: campo eliminado del modelo
-
-    public String getNotes() { return null; }
-    public void   setNotes(String notes) {} // no-op: campo eliminado del modelo
 }

@@ -1,5 +1,7 @@
 package com.itc.healthtrack.controllers;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.UserRecord;
 import com.itc.healthtrack.dao.GenericDAO;
 import com.itc.healthtrack.models.User;
 import javafx.application.Platform;
@@ -12,6 +14,7 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 // Controlador para la gestión de pacientes (CRUD).
 // Las notas médicas se manejan en RecommendationsController (sección Inteligencia Clínica).
@@ -95,20 +98,46 @@ public class PatientsController {
     protected void onSavePatient() {
         try {
             if (selectedPatient == null) {
+                // ── CREAR NUEVO PACIENTE ─────────────────────────────────────────
                 User newPatient = new User();
                 fillUserFromForm(newPatient);
                 newPatient.setRole("patient");
                 newPatient.setAssignedDoctorId(loggedInDoctor.getUid());
 
+                // Generamos una contraseña temporal para crear la cuenta en Firebase Auth.
+                // El administrador debe compartirla con el paciente para su primer acceso.
+                String tempPassword = "Tmp@" + UUID.randomUUID().toString().substring(0, 8);
+                final String emailForAuth = newPatient.getEmail();
+
                 new Thread(() -> {
                     try {
-                        String newId = userDao.createDocumentId();
-                        newPatient.setUid(newId);
-                        userDao.save(newId, newPatient);
-                        Platform.runLater(() -> { onClearForm(); loadPatients(); });
-                    } catch (Exception e) { e.printStackTrace(); }
+                        // PASO 1 — Crear cuenta en Firebase Authentication
+                        UserRecord.CreateRequest authRequest = new UserRecord.CreateRequest()
+                                .setEmail(emailForAuth)
+                                .setPassword(tempPassword);
+                        UserRecord createdRecord = FirebaseAuth.getInstance().createUser(authRequest);
+                        String uid = createdRecord.getUid();
+                        System.out.println("[PatientsController] Auth creado — UID: " + uid
+                                + " | contraseña temporal: " + tempPassword);
+
+                        // PASO 2 — Guardar perfil en Firestore usando el UID de Auth como ID
+                        newPatient.setUid(uid);
+                        userDao.save(uid, newPatient);
+
+                        Platform.runLater(() -> {
+                            onClearForm();
+                            loadPatients();
+                            System.out.println("[PatientsController] Paciente creado. "
+                                    + "Contraseña temporal: " + tempPassword);
+                        });
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        System.err.println("[PatientsController] Error al crear paciente: " + e.getMessage());
+                    }
                 }).start();
+
             } else {
+                // ── ACTUALIZAR PACIENTE EXISTENTE ────────────────────────────────
                 fillUserFromForm(selectedPatient);
                 new Thread(() -> {
                     try {
@@ -125,11 +154,25 @@ public class PatientsController {
     @FXML
     protected void onDeletePatient() {
         if (selectedPatient == null) return;
+        String uidToDelete = selectedPatient.getUid();
+
         new Thread(() -> {
             try {
-                userDao.delete(selectedPatient.getUid());
+                // PASO 1 — Eliminar cuenta de Firebase Authentication
+                // Sin este paso el paciente podría seguir autenticándose aunque no tenga perfil
+                if (uidToDelete != null && !uidToDelete.isEmpty()) {
+                    FirebaseAuth.getInstance().deleteUser(uidToDelete);
+                    System.out.println("[PatientsController] Auth eliminado — UID: " + uidToDelete);
+                }
+
+                // PASO 2 — Eliminar perfil de Firestore
+                userDao.delete(uidToDelete);
+
                 Platform.runLater(() -> { onClearForm(); loadPatients(); });
-            } catch (Exception e) { e.printStackTrace(); }
+            } catch (Exception e) {
+                e.printStackTrace();
+                System.err.println("[PatientsController] Error al eliminar paciente: " + e.getMessage());
+            }
         }).start();
     }
 

@@ -4,6 +4,8 @@ import com.itc.healthtrack.dao.GenericDAO;
 import com.itc.healthtrack.models.Metric;
 import com.itc.healthtrack.models.Recommendation;
 import com.itc.healthtrack.models.User;
+import com.itc.healthtrack.services.UserService;
+import com.itc.healthtrack.utils.MetricUtils;
 import com.itextpdf.io.image.ImageData;
 import com.itextpdf.io.image.ImageDataFactory;
 import com.itextpdf.kernel.pdf.PdfDocument;
@@ -47,6 +49,7 @@ public class ReportsController {
     private final GenericDAO<Metric>         metricDao         = new GenericDAO<>(Metric.class, "metrics");
     // Necesitamos las recomendaciones para incluirlas en el PDF
     private final GenericDAO<Recommendation> recommendationDao = new GenericDAO<>(Recommendation.class, "recommendations");
+    private final UserService userService = new UserService();
     private User loggedInDoctor;
 
     /*Inicializa el controlador con los datos del usuario logeado
@@ -63,11 +66,11 @@ public class ReportsController {
         }
     }
 
-    // Carga la lista de pacientes en el menu desplegable
+    // Carga la lista de pacientes en el menú desplegable
     private void loadPatients() {
         new Thread(() -> {
             try {
-                List<User> patients = getPatientsForUser(loggedInDoctor);
+                List<User> patients = userService.getPatientsForUser(loggedInDoctor);
                 Platform.runLater(() -> {
                     comboPatients.setItems(FXCollections.observableArrayList(patients));
                 });
@@ -465,30 +468,8 @@ public class ReportsController {
     // Obtiene el historial de métricas de un paciente y lo ordena por fecha
     private List<Metric> getMetricsByPatientId(String patientId) throws Exception {
         List<Metric> metrics = metricDao.getByField("patientId", patientId);
-        sortMetricsByTimestamp(metrics);
+        MetricUtils.sortByTimestampDesc(metrics);
         return metrics;
-    }
-
-    private List<User> getPatientsForUser(User user) throws Exception {
-        List<User> all = userDao.getByField("role", "patient");
-        List<User> visible = new ArrayList<>();
-        for (User p : all) {
-            if ("admin".equals(user.getRole())) {
-                visible.add(p);
-            } else if (user.getUid() != null && user.getUid().equals(p.getAssignedDoctorId())) {
-                visible.add(p);
-            }
-        }
-        return visible;
-    }
-
-    private void sortMetricsByTimestamp(List<Metric> metrics) {
-        metrics.sort((a, b) -> {
-            if (a.getTimestamp() == null && b.getTimestamp() == null) return 0;
-            if (a.getTimestamp() == null) return 1;
-            if (b.getTimestamp() == null) return -1;
-            return b.getTimestamp().compareTo(a.getTimestamp());
-        });
     }
 
     // Analiza la métrica más reciente y devuelve un texto con todas las alertas clínicas detectadas.

@@ -2,6 +2,7 @@ package com.itc.healthtrack.controllers;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.itc.healthtrack.config.AppConfig;
 import com.itc.healthtrack.dao.GenericDAO;
 import com.itc.healthtrack.models.User;
 import javafx.application.Platform;
@@ -51,9 +52,6 @@ import java.util.List;
  *      3. Loggear el JSON crudo en caso de error no reconocido.
  */
 public class LoginController {
-
-    // Token de acceso médico — debe coincidir con el de RegisterController
-    private static final String TOKEN_DOCTOR = "DOCTOR-2026";
 
     // Credenciales Firebase Identity Toolkit REST API
     private static final String FIREBASE_WEB_API_KEY   = "AIzaSyBOlSDOZdQMwxy6Ev9t2hUbcV3PiB_4paI";
@@ -217,7 +215,7 @@ public class LoginController {
             return;
         }
 
-        if (!TOKEN_DOCTOR.equals(token)) {
+        if (!AppConfig.TOKEN_DOCTOR.equals(token)) {
             showError("Código de acceso médico incorrecto.");
             return;
         }

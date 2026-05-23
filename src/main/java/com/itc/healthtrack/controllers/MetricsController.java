@@ -5,6 +5,9 @@ import com.itc.healthtrack.dao.GenericDAO;
 import com.itc.healthtrack.models.Metric;
 import com.itc.healthtrack.models.User;
 import com.itc.healthtrack.services.NotificationService;
+import com.itc.healthtrack.services.UserService;
+import com.itc.healthtrack.utils.DialogUtils;
+import com.itc.healthtrack.utils.MetricUtils;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -38,10 +41,11 @@ public class MetricsController {
     @FXML private LineChart<String, Number> evolutionChart;       // Gráfico de línea: Evolución de presión
     @FXML private BarChart<String, Number> averagesChart;         // Gráfico de barras: Promedios
 
-    // Acceso a la base de datos y variables de estado
-    private final GenericDAO<User> userDao = new GenericDAO<>(User.class, "users");
+    // Acceso a la base de datos y servicios
     private final GenericDAO<Metric> metricDao = new GenericDAO<>(Metric.class, "metrics");
+    private final GenericDAO<User> userDao = new GenericDAO<>(User.class, "users");
     private final NotificationService notificationService = new NotificationService();
+    private final UserService userService = new UserService();
     private final ObservableList<Metric> metricsObservableList = FXCollections.observableArrayList();
 
     // Estado del controlador
@@ -133,7 +137,7 @@ public class MetricsController {
     private void loadPatientsIntoCombo() {
         new Thread(() -> {
             try {
-                List<User> patients = getPatientsForUser(loggedInDoctor);
+                List<User> patients = userService.getPatientsForUser(loggedInDoctor);
                 Platform.runLater(() -> comboPatients.setItems(FXCollections.observableArrayList(patients)));
             } catch (Exception e) {
                 e.printStackTrace();
@@ -316,10 +320,15 @@ public class MetricsController {
             metricToProcess.setGlucoseLevel(txtGlucose.getText().isEmpty() ? null : Double.parseDouble(txtGlucose.getText()));
             metricToProcess.setWeight(txtWeight.getText().isEmpty() ? null : Double.parseDouble(txtWeight.getText()));
 
-            // Verificamos que el peso y la altura existan
-            // y que la altura sea mayor a 0 para evitar un error matemático
-            if (metricToProcess.getWeight() != null && selectedPatient.getHeight() != null && selectedPatient.getHeight() > 0) {
+            // Calcular el IMC si están disponibles el peso y la altura
+            if (metricToProcess.getWeight() != null && selectedPatient.getHeight() != null
+                    && selectedPatient.getHeight() > 0) {
                 double heightM = selectedPatient.getHeight();
+                // Si la altura es mayor a 3.0, se asume que fue ingresada en centímetros (ej: 175)
+                // y se convierte a metros automáticamente (175 → 1.75)
+                if (heightM > 3.0) {
+                    heightM = heightM / 100.0;
+                }
                 double bmi = metricToProcess.getWeight() / (heightM * heightM);
                 metricToProcess.setBmi(Math.round(bmi * 10.0) / 10.0);
             }
@@ -425,7 +434,7 @@ public class MetricsController {
             alert.setTitle("Alerta Clínica — HealthTrack");
             alert.setHeaderText("Se detectaron valores fuera del rango clínico normal");
             alert.setContentText(message);
-            applyWhiteDialogStyle(alert.getDialogPane());
+            DialogUtils.applyWhiteStyle(alert.getDialogPane());
             alert.showAndWait();
 
             // Actualizar etiqueta de estado
@@ -507,55 +516,10 @@ public class MetricsController {
         btnSave.setText("Guardar");
     }
 
-    // Obtiene la lista de pacientes que el usuario logeado puede ver
-    private List<User> getPatientsForUser(User user) throws Exception {
-        List<User> all = userDao.getByField("role", "patient");
-        List<User> visible = new ArrayList<>();
-        for (User p : all) {
-            if ("admin".equals(user.getRole())) {
-                visible.add(p);
-            } else if (user.getUid() != null && user.getUid().equals(p.getAssignedDoctorId())) {
-                visible.add(p);
-            }
-        }
-        return visible;
-    }
-
-    // Aplica el estilo blanco uniforme a los diálogos de este controlador
-    private void applyWhiteDialogStyle(DialogPane dp) {
-        dp.setStyle("-fx-background-color: #ffffff; -fx-font-size: 13px;");
-        javafx.scene.Node content = dp.lookup(".content.label");
-        if (content != null) content.setStyle("-fx-text-fill: #222222; -fx-font-size: 13px;");
-        javafx.scene.Node header = dp.lookup(".header-panel");
-        if (header != null) header.setStyle("-fx-background-color: #f5f5f5;");
-        javafx.scene.Node headerLabel = dp.lookup(".header-panel .label");
-        if (headerLabel != null) headerLabel.setStyle("-fx-text-fill: #111111; -fx-font-weight: bold;");
-        for (ButtonType bt : dp.getButtonTypes()) {
-            javafx.scene.Node node = dp.lookupButton(bt);
-            if (node instanceof Button) {
-                Button btn = (Button) node;
-                boolean cancel = (bt == ButtonType.CANCEL || bt == ButtonType.NO || bt == ButtonType.CLOSE);
-                btn.setStyle("-fx-background-color: " + (cancel ? "#9e9e9e" : "#2196f3") +
-                        "; -fx-text-fill: #ffffff; -fx-cursor: hand;" +
-                        " -fx-padding: 6 22; -fx-background-radius: 4;");
-            }
-        }
-    }
-
     // Obtiene el historial de métricas de un paciente y lo ordena por fecha
     private List<Metric> getMetricsByPatientId(String patientId) throws Exception {
         List<Metric> metrics = metricDao.getByField("patientId", patientId);
-        sortMetricsByTimestamp(metrics);
+        MetricUtils.sortByTimestampDesc(metrics);
         return metrics;
-    }
-
-    // Ordena una lista de métricas de más reciente a más antigua
-    private void sortMetricsByTimestamp(List<Metric> metrics) {
-        metrics.sort((a, b) -> {
-            if (a.getTimestamp() == null && b.getTimestamp() == null) return 0;
-            if (a.getTimestamp() == null) return 1;
-            if (b.getTimestamp() == null) return -1;
-            return b.getTimestamp().compareTo(a.getTimestamp());
-        });
     }
 }
