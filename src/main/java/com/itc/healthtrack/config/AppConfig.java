@@ -1,14 +1,5 @@
 package com.itc.healthtrack.config;
 
-/**
- * Constantes de configuración compartidas en toda la aplicación.
- *
- * Centraliza los tokens de seguridad para evitar duplicación entre
- * LoginController y RegisterController.
- *
- * NOTA: En producción, estos valores deben provenir de un backend
- * seguro o de variables de entorno, nunca de código fuente.
- */
 public class AppConfig {
 
     // Token de acceso requerido para registrar o iniciar sesión como médico
