@@ -15,12 +15,6 @@ public class NotificationService {
     private static final String SMTP_HOST = "smtp.gmail.com";
     private static final String SMTP_PORT = "587";
 
-    // IMPORTANTE — Para que el correo funcione hay que hacer esto en la cuenta de Gmail:
-    //   1. Activar la verificación en dos pasos (Cuenta Google → Seguridad → Verificación en 2 pasos)
-    //   2. Crear una "Contraseña de aplicación" (Seguridad → Contraseñas de aplicación)
-    //      Nombre sugerido: "HealthTrack SMTP"
-    //   3. Copiar la contraseña de 16 caracteres generada y pegarla en SYSTEM_PASSWORD
-    // Sin ese paso, Gmail rechaza la conexión con error "Authentication failed".
     private static final String SYSTEM_EMAIL = "clinicahealthtrack@gmail.com";
     private static final String SYSTEM_PASSWORD = "yaih bgnl dubi ctgs";
 
