@@ -47,8 +47,8 @@ public class ReportsController {
     // Acceso a datos
     private final GenericDAO<User>           userDao           = new GenericDAO<>(User.class, "users");
     private final GenericDAO<Metric>         metricDao         = new GenericDAO<>(Metric.class, "metrics");
-    // Necesitamos las recomendaciones para incluirlas en el PDF
-    private final GenericDAO<Recommendation> recommendationDao = new GenericDAO<>(Recommendation.class, "recommendations");
+    // Necesitamos las notas para incluirlas en el PDF
+    private final GenericDAO<Recommendation> recommendationDao = new GenericDAO<>(Recommendation.class, "notas");
     private final UserService userService = new UserService();
     private User loggedInDoctor;
 

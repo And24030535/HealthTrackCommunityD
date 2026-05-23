@@ -31,6 +31,26 @@ public class NotificationService {
         }).start();
     }
 
+    /**
+     * Envía una recomendación médica formal al paciente por correo electrónico.
+     * Solo debe invocarse cuando el usuario logueado tiene rol "doctor".
+     *
+     * @param patient        Paciente destinatario (debe tener email válido)
+     * @param doctorFullName Nombre completo del médico que envía la recomendación
+     * @param title          Título de la recomendación
+     * @param message        Cuerpo de la recomendación
+     */
+    public void sendRecommendationEmail(User patient, String doctorFullName, String title, String message) {
+        new Thread(() -> {
+            String subject    = "HealthTrack - Nueva recomendación de tu médico";
+            String patientName = patient.getFirstName() + " " + patient.getLastName();
+            String body = "Tu médico " + doctorFullName + " ha generado una nueva recomendación para ti:\n\n"
+                    + "Título: " + title + "\n\n"
+                    + "Mensaje:\n" + message;
+            sendEmail(patient.getEmail(), subject, patientName, body);
+        }).start();
+    }
+
     // Método para notificar al médico encargado. También utiliza un hilo secundario independiente.
     public void notifyDoctor(User doctor, String message) {
         new Thread(() -> {

@@ -56,11 +56,13 @@ public class RecommendationsController {
     @FXML private TextArea                 txtNutrition;        // Datos USDA
     @FXML private ListView<Recommendation> listHistory;         // Historial de análisis guardados
 
-    // Sección de notas médicas (médico escribe, paciente/admin solo lee)
-    @FXML private VBox     notesSection;
-    @FXML private VBox     noteWriteSection;  // Solo visible para médicos
-    @FXML private TextArea txtNoteInput;       // Campo de escritura de notas
-    @FXML private VBox     vboxNotesList;      // Contenedor dinámico: un bloque visual por cada nota
+    // Sección de notas / recomendaciones médicas
+    @FXML private VBox      notesSection;
+    @FXML private VBox      noteWriteSection;         // Solo visible para médicos
+    @FXML private TextField txtRecommendationTitle;   // Título de la recomendación (compartido con la nota)
+    @FXML private TextArea  txtNoteInput;             // Mensaje de la nota / recomendación
+    @FXML private Label     lblRecommendationStatus;  // Resultado del último envío
+    @FXML private VBox      vboxNotesList;            // Contenedor dinámico de notas guardadas
 
     // -------------------------------------------------------------------
     // DAOs — solo GenericDAO<T>, sin DAOs especializados
@@ -69,8 +71,8 @@ public class RecommendationsController {
     private final GenericDAO<User>           userDAO           = new GenericDAO<>(User.class, "users");
     // Accede a la colección "metrics" para leer el historial clínico del paciente
     private final GenericDAO<Metric>         metricDAO         = new GenericDAO<>(Metric.class, "metrics");
-    // Accede a la colección "recommendations" para guardar y recuperar análisis
-    private final GenericDAO<Recommendation> recommendationDAO = new GenericDAO<>(Recommendation.class, "recommendations");
+    // Accede a la colección "notas" para guardar y recuperar análisis
+    private final GenericDAO<Recommendation> recommendationDAO = new GenericDAO<>(Recommendation.class, "notas");
 
     private final NotificationService notificationService = new NotificationService();
     private final UserService userService = new UserService();
@@ -195,7 +197,8 @@ public class RecommendationsController {
                 List<Recommendation> notes    = new ArrayList<>();
 
                 for (Recommendation r : all) {
-                    if ("note".equals(r.getType())) {
+                    // Las notas del médico y las recomendaciones enviadas por email van al panel de notas
+                    if ("note".equals(r.getType()) || "doctor_recommendation".equals(r.getType())) {
                         notes.add(r);
                     } else {
                         analyses.add(r);
@@ -372,7 +375,7 @@ public class RecommendationsController {
     // Persistencia de recomendación via GenericDAO (reemplaza RecommendationDAO)
     // -------------------------------------------------------------------
 
-    // Guarda el análisis generado en la colección "recommendations" de Firestore.
+    // Guarda el análisis generado en la colección "notas" de Firestore.
     // Usa GenericDAO<Recommendation>.save() en lugar de RecommendationDAO.
     private void persistRecommendation(String patientId, String analysisText) {
         new Thread(() -> {
@@ -641,30 +644,121 @@ public class RecommendationsController {
         String texto = txtNoteInput.getText().trim();
         if (texto.isEmpty()) return;
 
-        // Armamos el objeto nota con todos sus datos antes de lanzar el hilo
+        // Usa el título del campo compartido si tiene contenido, si no genera uno automático
+        String titulo = (txtRecommendationTitle != null && !txtRecommendationTitle.getText().trim().isEmpty())
+                ? txtRecommendationTitle.getText().trim()
+                : "Nota del Dr. " + loggedInDoctor.getLastName();
+
         Recommendation nota = new Recommendation();
         nota.setPatientId  (paciente.getUid());
         nota.setDoctorId   (loggedInDoctor.getUid());
         nota.setType       ("note");
-        nota.setTitle      ("Nota del Dr. " + loggedInDoctor.getLastName());
+        nota.setTitle      (titulo);
         nota.setMessage    (texto);
         nota.setGeneratedAt(Timestamp.now());
         nota.setIsRead     (false);
 
-        // Guardamos en Firebase en hilo de fondo para no bloquear la interfaz
         new Thread(() -> {
             try {
                 String nuevoId = recommendationDAO.createDocumentId();
                 nota.setId(nuevoId);
-                // Aquí guardamos la nota en Firebase dentro de la colección "recommendations"
                 recommendationDAO.save(nuevoId, nota);
-                // Limpiamos el campo y recargamos con una sola consulta en el hilo de JavaFX
                 Platform.runLater(() -> {
                     txtNoteInput.clear();
+                    if (txtRecommendationTitle != null) txtRecommendationTitle.clear();
+                    if (lblRecommendationStatus != null) {
+                        lblRecommendationStatus.setText("Nota guardada correctamente.");
+                        lblRecommendationStatus.setTextFill(javafx.scene.paint.Color.web("#4caf50"));
+                    }
                     loadAllRecommendationsForPatient(paciente.getUid());
                 });
             } catch (Exception e) {
                 System.err.println("[RecommendationsController] Error al guardar nota: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    /**
+     * Guarda una recomendación formal en Firestore y la envía al paciente por correo electrónico.
+     * Solo disponible para usuarios con rol "doctor".
+     * Usa el título de txtRecommendationTitle y el mensaje de txtNoteInput.
+     */
+    @FXML
+    protected void onSendRecommendation() {
+        // Verificación de rol: solo médicos pueden enviar recomendaciones por email
+        if (loggedInDoctor == null || !"doctor".equals(loggedInDoctor.getRole())) {
+            if (lblRecommendationStatus != null) {
+                lblRecommendationStatus.setText("Solo los médicos pueden enviar recomendaciones.");
+                lblRecommendationStatus.setTextFill(javafx.scene.paint.Color.web("#ff5252"));
+            }
+            return;
+        }
+
+        User patient = comboPatients.getValue();
+        if (patient == null) {
+            if (lblRecommendationStatus != null) {
+                lblRecommendationStatus.setText("Selecciona un paciente primero.");
+                lblRecommendationStatus.setTextFill(javafx.scene.paint.Color.web("#ff5252"));
+            }
+            return;
+        }
+
+        String title   = (txtRecommendationTitle != null) ? txtRecommendationTitle.getText().trim() : "";
+        String message = (txtNoteInput           != null) ? txtNoteInput.getText().trim()           : "";
+
+        if (title.isEmpty() || message.isEmpty()) {
+            if (lblRecommendationStatus != null) {
+                lblRecommendationStatus.setText("Completa el título y el mensaje antes de enviar.");
+                lblRecommendationStatus.setTextFill(javafx.scene.paint.Color.web("#ff5252"));
+            }
+            return;
+        }
+
+        String doctorName = "Dr. " + loggedInDoctor.getFirstName() + " " + loggedInDoctor.getLastName();
+
+        if (lblRecommendationStatus != null) {
+            lblRecommendationStatus.setText("Guardando y enviando correo...");
+            lblRecommendationStatus.setTextFill(javafx.scene.paint.Color.web("#ffffff"));
+        }
+
+        // Construimos el objeto Recommendation antes de lanzar el hilo
+        Recommendation rec = new Recommendation();
+        rec.setPatientId  (patient.getUid());
+        rec.setDoctorId   (loggedInDoctor.getUid());
+        rec.setGeneratedAt(Timestamp.now());
+        rec.setType       ("doctor_recommendation");
+        rec.setTitle      (title);
+        rec.setMessage    (message);
+        rec.setIsRead     (false);
+
+        new Thread(() -> {
+            try {
+                // 1. Guardar en Firestore
+                String newId = recommendationDAO.createDocumentId();
+                rec.setId(newId);
+                recommendationDAO.save(newId, rec);
+
+                // 2. Enviar correo al paciente
+                notificationService.sendRecommendationEmail(patient, doctorName, title, message);
+
+                Platform.runLater(() -> {
+                    if (txtNoteInput           != null) txtNoteInput.clear();
+                    if (txtRecommendationTitle != null) txtRecommendationTitle.clear();
+                    if (lblRecommendationStatus != null) {
+                        lblRecommendationStatus.setText("Recomendación guardada y correo enviado");
+                        lblRecommendationStatus.setTextFill(javafx.scene.paint.Color.web("#4caf50"));
+                    }
+                    loadAllRecommendationsForPatient(patient.getUid());
+                });
+
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    if (lblRecommendationStatus != null) {
+                        lblRecommendationStatus.setText("Error al guardar o enviar: " + e.getMessage());
+                        lblRecommendationStatus.setTextFill(javafx.scene.paint.Color.web("#ff5252"));
+                    }
+                });
+                System.err.println("[RecommendationsController] Error en onSendRecommendation: " + e.getMessage());
             }
         }).start();
     }

@@ -166,7 +166,7 @@ public class MetricsController {
         }).start();
     }
 
-    /*Aplica el filtro de período al historial complet o de métricas
+    /*Aplica el filtro de período al historial completo de métricas
      Actualiza la tabla, gráficos y calcula promedios según el filtro seleccionado*/
     private void applyTimeFilter() {
         if (currentPatientHistory.isEmpty()) {

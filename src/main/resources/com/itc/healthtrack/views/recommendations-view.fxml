@@ -83,13 +83,35 @@
 
         <HBox spacing="15.0" VBox.vgrow="ALWAYS" minHeight="200.0">
 
-            <VBox fx:id="noteWriteSection" spacing="5.0" prefWidth="300.0"
+            <VBox fx:id="noteWriteSection" spacing="8.0" prefWidth="300.0"
                   visible="false" managed="false" VBox.vgrow="ALWAYS">
+
+                <!-- Título compartido por "Guardar Nota" y "Enviar Recomendación" -->
+                <TextField fx:id="txtRecommendationTitle"
+                           promptText="Título de la recomendación o nota"
+                           style="-fx-control-inner-background: #2c2c2c;
+                                  -fx-text-fill: #e0e0e0;
+                                  -fx-prompt-text-fill: #888888;
+                                  -fx-border-color: #444444;
+                                  -fx-border-radius: 3;
+                                  -fx-background-radius: 3;" />
+
                 <TextArea fx:id="txtNoteInput" wrapText="true" VBox.vgrow="ALWAYS"
-                          promptText="Escribir nota..."
+                          promptText="Escribe el mensaje aquí..."
                           style="-fx-control-inner-background: #2c2c2c; -fx-text-fill: #e0e0e0;" />
+
+                <!-- Guardar como nota interna (no envía email) -->
                 <Button text="Guardar Nota" onAction="#onSaveDoctorNote"
                         styleClass="btn-primary" maxWidth="Infinity" prefHeight="35.0"/>
+
+                <!-- Enviar como recomendación formal al paciente por email -->
+                <Button text="Enviar Recomendación por Email" onAction="#onSendRecommendation"
+                        styleClass="btn-success" maxWidth="Infinity" prefHeight="35.0"/>
+
+                <!-- Estado del último guardado / envío -->
+                <Label fx:id="lblRecommendationStatus" wrapText="true" maxWidth="Infinity"
+                       style="-fx-font-size: 12px; -fx-text-fill: #aaaaaa;" />
+
             </VBox>
 
             <VBox spacing="5.0" HBox.hgrow="ALWAYS" VBox.vgrow="ALWAYS">
