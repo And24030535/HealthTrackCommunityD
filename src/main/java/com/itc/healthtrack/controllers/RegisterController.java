@@ -20,13 +20,12 @@ import org.kordamp.bootstrapfx.BootstrapFX;
 
 import java.util.List;
 
-// controlador para registrar nuevos usuarios en el sistema
-// segun el rol elegido puede requerir un token de acceso para medicos y admins
+// controlador para registrar nuevos usuarios
+// segun el rol elegido pide un token de acceso para medicos y admins
 public class RegisterController {
 
-    // Los tokens de seguridad están centralizados en AppConfig para evitar duplicación
+    // los tokens viven en AppConfig para evitar duplicacion
 
-    // Campos del formulario
     @FXML private TextField        txtFirstName;
     @FXML private TextField        txtLastName;
     @FXML private TextField        txtEmail;
@@ -34,10 +33,9 @@ public class RegisterController {
     @FXML private DatePicker       dpBirthDate;
     @FXML private PasswordField    txtPassword;
     @FXML private PasswordField    txtConfirmPassword;
-    @FXML private ComboBox<String> comboGender;    // M / F / Otro
-    @FXML private ComboBox<String> comboRole;      // Paciente / Doctor / Admin
+    @FXML private ComboBox<String> comboGender;
+    @FXML private ComboBox<String> comboRole;
 
-    // Sección de token
     @FXML private VBox      tokenSection;
     @FXML private Label     lblTokenLabel;
     @FXML private TextField txtToken;
@@ -45,17 +43,16 @@ public class RegisterController {
     @FXML private Label  lblStatus;
     @FXML private Button btnRegister;
 
-    // unico dao que necesitamos para guardar el nuevo perfil en firestore
+    // unico dao para guardar el nuevo perfil en firestore
     private final GenericDAO<User> userDAO = new GenericDAO<>(User.class, "users");
 
-    // Inicialización
     @FXML
     public void initialize() {
         comboGender.getItems().addAll("M", "F", "Otro");
         comboRole.getItems().addAll("Paciente", "Doctor", "Admin");
         comboRole.setValue("Paciente");
 
-        // Mostrar / ocultar el campo de token según el rol seleccionado
+        // mostramos u ocultamos el campo de token segun el rol seleccionado
         comboRole.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             boolean needsToken = "Doctor".equals(newVal) || "Admin".equals(newVal);
             tokenSection.setVisible(needsToken);
@@ -71,11 +68,10 @@ public class RegisterController {
         });
     }
 
-    // Registro
     @FXML
     protected void onRegister(ActionEvent event) {
 
-        // Leer TODOS los valores de la UI en el hilo FX antes del hilo
+        // leemos todos los valores de la ui en el hilo fx antes de lanzar el hilo de fondo
         final String firstName    = txtFirstName.getText().trim();
         final String lastName     = txtLastName.getText().trim();
         final String email        = txtEmail.getText().trim();
@@ -88,7 +84,7 @@ public class RegisterController {
         final String birthDateStr = dpBirthDate.getValue() != null
                 ? dpBirthDate.getValue().toString() : null;
 
-        //Validaciones básicas
+        // validaciones basicas
         if (firstName.isEmpty() || lastName.isEmpty() || email.isEmpty() || password.isEmpty()) {
             showStatus("Por favor, completa todos los campos obligatorios.", false);
             return;
@@ -106,7 +102,7 @@ public class RegisterController {
             return;
         }
 
-        // Validación de token para roles elevados
+        // validacion de token para roles elevados
         if ("Doctor".equals(roleLabel)) {
             if (tokenInput.isEmpty()) {
                 showTokenAlert("Se requiere el código de acceso médico para registrarse como Doctor.\n"
@@ -131,7 +127,7 @@ public class RegisterController {
             }
         }
 
-        // Mapear etiqueta de rol a valor interno
+        // mapeamos la etiqueta de rol al valor interno
         final String mappedRole;
         switch (roleLabel) {
             case "Doctor": mappedRole = "doctor";  break;
@@ -139,7 +135,7 @@ public class RegisterController {
             default:       mappedRole = "patient"; break;
         }
 
-        // Validar formato de altura
+        // validamos el formato de la altura
         Double parsedHeight = null;
         if (!heightText.isEmpty()) {
             try {
@@ -156,7 +152,7 @@ public class RegisterController {
         new Thread(() -> {
             try {
 
-                // Crear cuenta en Firebase Auth (Admin SDK)
+                // creamos la cuenta en firebase auth admin sdk
                 UserRecord.CreateRequest authRequest = new UserRecord.CreateRequest()
                         .setEmail(email)
                         .setPassword(password);
@@ -164,18 +160,18 @@ public class RegisterController {
                 String uid = createdRecord.getUid();
                 System.out.println("[RegisterController] Auth OK — UID: " + uid);
 
-                // Construir perfil para Firestore (sin contraseña)
+                // construimos el perfil para firestore sin password
                 User profile = new User();
                 profile.setUid(uid);
                 profile.setEmail(email);
                 profile.setFirstName(firstName);
                 profile.setLastName(lastName);
-                profile.setRole(mappedRole);  // rol validado por token
+                profile.setRole(mappedRole);
                 profile.setGender(gender);
                 if (birthDateStr != null) profile.setBirthDate(birthDateStr);
                 if (finalHeight  != null) profile.setHeight(finalHeight);
 
-                // Auto-asignar médico si el nuevo usuario es paciente
+                // auto asignamos un medico si el nuevo usuario es paciente
                 if ("patient".equals(mappedRole)) {
                     List<User> doctors = userDAO.getByField("role", "doctor");
                     if (!doctors.isEmpty()) {
@@ -186,12 +182,12 @@ public class RegisterController {
                     }
                 }
 
-                // Guardar perfil en Firestore usando el UID como ID del documento
+                // guardamos el perfil en firestore usando el uid como id del documento
                 userDAO.save(uid, profile);
                 System.out.println("[RegisterController] Perfil guardado en Firestore — UID: " + uid
                         + ", rol: " + mappedRole);
 
-                // Éxito — mostrar confirmación y redirigir al login
+                // mostramos confirmacion y redirigimos al login
                 Platform.runLater(() -> {
                     String displayRole = "doctor".equals(mappedRole) ? "Doctor"
                                        : "admin".equals(mappedRole)  ? "Administrador"
@@ -227,9 +223,7 @@ public class RegisterController {
         }).start();
     }
 
-    // Alerta de token inválido
-
-
+    // alerta de token invalido
     private void showTokenAlert(String message) {
         Alert alert = new Alert(Alert.AlertType.WARNING);
         alert.setTitle("Código de Acceso Requerido");
@@ -239,8 +233,7 @@ public class RegisterController {
         alert.showAndWait();
     }
 
-    // Helpers de Firebase Auth
-    // obtiene el codigo de error de firebase con compatibilidad entre versiones del SDK
+    // obtiene el codigo de error de firebase con compatibilidad entre versiones del sdk
     private String resolveAuthErrorCode(com.google.firebase.auth.FirebaseAuthException ex) {
         try { if (ex.getAuthErrorCode() != null) return ex.getAuthErrorCode().name(); }
         catch (Exception ignored) {}
@@ -266,8 +259,6 @@ public class RegisterController {
         }
     }
 
-    // Navegación
-
     @FXML
     protected void onGoToLogin(ActionEvent event) {
         goToLogin(event);
@@ -282,7 +273,7 @@ public class RegisterController {
             scene.getStylesheets().add(getClass().getResource("/css/main.css").toExternalForm());
             Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
             stage.setScene(scene);
-            // Mantener pantalla completa al volver al login
+            // mantener pantalla completa al volver al login
             stage.setFullScreen(true);
             stage.setFullScreenExitKeyCombination(javafx.scene.input.KeyCombination.NO_MATCH);
         } catch (Exception e) {
@@ -290,8 +281,6 @@ public class RegisterController {
             showStatus("Error al volver al login.", false);
         }
     }
-
-    // UI helper
 
     private void showStatus(String message, boolean isSuccess) {
         lblStatus.setText(message);

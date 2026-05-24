@@ -9,7 +9,7 @@ import org.kordamp.bootstrapfx.BootstrapFX;
 
 import java.io.IOException;
 
-//Clase principal que arranca la aplicacion y carga la pantalla de Login
+// clase principal que arranca la app y carga el login
 public class HealthTrackApplication extends Application {
     @Override
     public void start(Stage stage) throws IOException {
@@ -23,9 +23,9 @@ public class HealthTrackApplication extends Application {
         stage.setTitle("HealthTrack Community");
         stage.setScene(scene);
         stage.show();
-        // Inicia la app en pantalla completa para la presentación
+        // arrancamos en pantalla completa para la presentacion
         stage.setFullScreen(true);
-        // Evita que el usuario salga accidentalmente de pantalla completa con ESC
+        // evita que el usuario salga de pantalla completa con ESC
         stage.setFullScreenExitKeyCombination(KeyCombination.NO_MATCH);
     }
 }

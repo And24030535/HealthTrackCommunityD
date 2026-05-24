@@ -4,47 +4,35 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.DialogPane;
 
-/**
- * Utilidad para aplicar estilo visual uniforme a los diálogos de la aplicación.
- *
- * Antes, cada controlador (AdminController, MetricsController, RegisterController)
- * tenía su propia copia del mismo método applyWhiteDialogStyle().
- * Esta clase centraliza ese estilo para evitar duplicación.
- */
+// estilo blanco uniforme para todos los dialogos de la app
 public class DialogUtils {
 
-    // Constructor privado: clase de utilidad, no se instancia
     private DialogUtils() {}
 
-    /**
-     * Aplica el estilo blanco estándar de HealthTrack al panel de un diálogo.
-     * Cambia el fondo, el texto del contenido, el encabezado y los botones.
-     *
-     * @param dp el DialogPane del Alert o Dialog a estilizar
-     */
+    // aplica el estilo blanco al panel del dialogo
     public static void applyWhiteStyle(DialogPane dp) {
-        // Fondo blanco para el panel completo
+        // fondo blanco
         dp.setStyle("-fx-background-color: #ffffff; -fx-font-size: 13px;");
 
-        // Texto del contenido en color oscuro para contraste
+        // texto del contenido en oscuro
         javafx.scene.Node content = dp.lookup(".content.label");
         if (content != null) {
             content.setStyle("-fx-text-fill: #222222; -fx-font-size: 13px;");
         }
 
-        // Encabezado con fondo gris claro
+        // encabezado en gris claro
         javafx.scene.Node header = dp.lookup(".header-panel");
         if (header != null) {
             header.setStyle("-fx-background-color: #f5f5f5;");
         }
 
-        // Texto del encabezado en negro y negrita
+        // texto del encabezado en negro
         javafx.scene.Node headerLabel = dp.lookup(".header-panel .label");
         if (headerLabel != null) {
             headerLabel.setStyle("-fx-text-fill: #111111; -fx-font-weight: bold;");
         }
 
-        // Botones: azul para confirmación, gris para cancelar/cerrar
+        // botones azul para confirmar y gris para cancelar
         for (ButtonType bt : dp.getButtonTypes()) {
             javafx.scene.Node node = dp.lookupButton(bt);
             if (node instanceof Button) {

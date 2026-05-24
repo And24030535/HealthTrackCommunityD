@@ -6,15 +6,13 @@ import com.itc.healthtrack.models.User;
 import java.util.ArrayList;
 import java.util.List;
 
-// servicio que centraliza la logica para obtener la lista de pacientes visible para cada usuario
+// centraliza la logica para obtener la lista de pacientes visibles para cada usuario
 public class UserService {
 
-    // dao para consultar la coleccion de usuarios en firestore
     private final GenericDAO<User> userDao = new GenericDAO<>(User.class, "users");
 
     // devuelve los pacientes que el usuario logeado puede ver
-    // si es admin ve todos los pacientes del sistema
-    // si es medico solo ve los pacientes que tiene asignados a el
+    // si es admin ve todos y si es medico solo ve los suyos
     public List<User> getPatientsForUser(User viewer) throws Exception {
         List<User> allPatients = userDao.getByField("role", "patient");
         List<User> visiblePatients = new ArrayList<>();

@@ -8,21 +8,21 @@ import javax.mail.internet.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
-// Servicio asíncrono para enviar notificaciones por correo electrónico usando SMTP
+// servicio asincrono para enviar correos por smtp
 public class NotificationService {
 
-    // Configuración del servidor SMTP de Gmail
+    // config del servidor smtp de gmail
     private static final String SMTP_HOST = "smtp.gmail.com";
     private static final String SMTP_PORT = "587";
 
     private static final String SYSTEM_EMAIL = "clinicahealthtrack@gmail.com";
     private static final String SYSTEM_PASSWORD = "yaih bgnl dubi ctgs";
 
-    // Formato estándar para la marca de tiempo de los mensajes
+    // formato de la marca de tiempo
     private static final DateTimeFormatter TIMESTAMP_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    // Método para notificar a un paciente. Se ejecuta en un hilo secundario para evitar congelar la interfaz.
+    // notifica a un paciente en hilo secundario para no congelar la interfaz
     public void notifyPatient(User patient, String message) {
         new Thread(() -> {
             String subject = "HealthTrack - Alerta de Salud";
@@ -31,7 +31,7 @@ public class NotificationService {
         }).start();
     }
 
-    //Envía una recomendación médica formal al paciente por correo electrónico (cuando el usuario logueado tiene rol "doctor")
+    // manda al paciente una recomendacion formal desde el medico
     public void sendRecommendationEmail(User patient, String doctorFullName, String title, String message) {
         new Thread(() -> {
             String subject    = "HealthTrack - Nueva recomendación de tu médico";
@@ -43,7 +43,7 @@ public class NotificationService {
         }).start();
     }
 
-    // Método para notificar al médico encargado. También utiliza un hilo secundario independiente.
+    // notifica al medico tambien en hilo aparte
     public void notifyDoctor(User doctor, String message) {
         new Thread(() -> {
             String subject = "HealthTrack - Actualización de Paciente";
@@ -52,22 +52,22 @@ public class NotificationService {
         }).start();
     }
 
-    // Método principal interno que construye y transfiere el correo a través de la red
+    // construye y manda el correo
     private void sendEmail(String toEmail, String subject, String recipientName, String messageBody) {
-        // Verifica que la dirección destino sea válida antes de intentar conectar
+        // checamos que la direccion sea valida antes de intentar conectar
         if (toEmail == null || toEmail.isEmpty()) {
             System.err.println("No se proporcionó correo para el destinatario: " + recipientName);
             return;
         }
 
-        // Configuración de las propiedades de seguridad y conexión SMTP
+        // propiedades de seguridad y conexion smtp
         Properties properties = new Properties();
         properties.put("mail.smtp.auth", "true");
         properties.put("mail.smtp.starttls.enable", "true");
         properties.put("mail.smtp.host", SMTP_HOST);
         properties.put("mail.smtp.port", SMTP_PORT);
 
-        // Creación de la sesión autenticada con las credenciales del sistema
+        // sesion autenticada con las credenciales del sistema
         Session session = Session.getInstance(properties, new Authenticator() {
             @Override
             protected PasswordAuthentication getPasswordAuthentication() {
@@ -76,13 +76,13 @@ public class NotificationService {
         });
 
         try {
-            // Creación del paquete de correo (mensaje MIME)
+            // mensaje mime
             Message message = new MimeMessage(session);
             message.setFrom(new InternetAddress(SYSTEM_EMAIL));
             message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(toEmail));
             message.setSubject(subject);
 
-            // Construcción del cuerpo del correo que verá el usuario final
+            // cuerpo del correo que vera el usuario
             String timestamp = LocalDateTime.now().format(TIMESTAMP_FORMAT);
             String fullMessage = "Hola " + recipientName + ",\n\n" +
                     messageBody + "\n\n" +
@@ -91,7 +91,7 @@ public class NotificationService {
 
             message.setText(fullMessage);
 
-            // Ejecuta el envío final mediante el protocolo de transporte
+            // envio final
             Transport.send(message);
             System.out.println("Correo enviado exitosamente a: " + toEmail);
         } catch (MessagingException e) {

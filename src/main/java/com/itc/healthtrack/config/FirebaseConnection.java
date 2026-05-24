@@ -9,8 +9,7 @@ import com.google.firebase.cloud.FirestoreClient;
 import java.io.IOException;
 import java.io.InputStream;
 
-// clase que maneja la conexion con firebase usando el patron singleton
-// solo se crea una conexion y se reutiliza en todo el proyecto
+// conexion a firebase con singleton para reutilizar la misma instancia en todo el proyecto
 public class FirebaseConnection {
 
     private static volatile FirebaseConnection instance;
@@ -41,7 +40,7 @@ public class FirebaseConnection {
         }
     }
 
-    // devuelve la unica instancia de la conexion creandola si es la primera vez
+    // devuelve la unica instancia y la crea si es la primera vez
     public static FirebaseConnection getInstance() {
         if (instance == null) {
             synchronized (FirebaseConnection.class) {
@@ -53,7 +52,7 @@ public class FirebaseConnection {
         return instance;
     }
 
-    // regresa el objeto firestore para poder hacer consultas a la base de datos
+    // regresa el firestore para hacer consultas
     public Firestore getFirestore() {
         return db;
     }

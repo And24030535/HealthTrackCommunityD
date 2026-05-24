@@ -16,16 +16,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-// Controlador para la gestión de pacientes (CRUD).
-// Las notas médicas se manejan en RecommendationsController (sección Inteligencia Clínica).
+// crud de pacientes las notas medicas viven en RecommendationsController
 public class PatientsController {
 
-    // Formulario del paciente
     @FXML private TextField    txtFirstName, txtLastName, txtEmail, txtHeight;
     @FXML private ComboBox<String> comboGender;
     @FXML private DatePicker   dpBirthDate;
 
-    // Tabla
     @FXML private TableView<User>               tablePatients;
     @FXML private TableColumn<User, String>     colFirstName, colLastName, colEmail, colGender;
 
@@ -37,16 +34,12 @@ public class PatientsController {
     private User loggedInDoctor;
     private User selectedPatient = null;
 
-    // Inicialización
-
     public void initData(User doctor) {
         this.loggedInDoctor = doctor;
         setupTable();
         comboGender.setItems(FXCollections.observableArrayList("M", "F", "Otro"));
         loadPatients();
     }
-
-    // Configuración de tabla
 
     private void setupTable() {
         colFirstName.setCellValueFactory(new PropertyValueFactory<>("firstName"));
@@ -63,8 +56,6 @@ public class PatientsController {
             }
         });
     }
-
-    // CRUD de pacientes
 
     private void loadPatients() {
         new Thread(() -> {
@@ -92,26 +83,26 @@ public class PatientsController {
     protected void onSavePatient() {
         try {
             if (selectedPatient == null) {
-                // CREAR NUEVO PACIENTE
+                // crear nuevo paciente
                 User newPatient = new User();
                 fillUserFromForm(newPatient);
                 newPatient.setRole("patient");
                 newPatient.setAssignedDoctorId(loggedInDoctor.getUid());
 
-                // Generamos una contraseña temporal para crear la cuenta en Firebase Auth.
-                // El administrador debe compartirla con el paciente para su primer acceso.
+                // password temporal para crear la cuenta en firebase auth
+                // el admin debe compartirla con el paciente para su primer acceso
                 String tempPassword = "Tmp@" + UUID.randomUUID().toString().substring(0, 8);
                 final String emailForAuth = newPatient.getEmail();
 
                 new Thread(() -> {
                     try {
-                        // PASO 1 — Crear cuenta en Firebase Authentication
+                        // crear cuenta en firebase auth
                         UserRecord.CreateRequest authRequest = new UserRecord.CreateRequest()
                                 .setEmail(emailForAuth)
                                 .setPassword(tempPassword);
                         UserRecord createdRecord = FirebaseAuth.getInstance().createUser(authRequest);
                         String uid = createdRecord.getUid();
-                        // PASO 2 — Guardar perfil en Firestore usando el UID de Auth como ID
+                        // guardar perfil en firestore usando el uid de auth como id
                         newPatient.setUid(uid);
                         userDao.save(uid, newPatient);
 
@@ -126,7 +117,7 @@ public class PatientsController {
                 }).start();
 
             } else {
-                // ACTUALIZAR PACIENTE EXISTENTE
+                // actualizar paciente existente
                 fillUserFromForm(selectedPatient);
                 new Thread(() -> {
                     try {
@@ -147,14 +138,14 @@ public class PatientsController {
 
         new Thread(() -> {
             try {
-                // Eliminar cuenta de Firebase Authentication
-                // Sin este paso el paciente podría seguir autenticándose aunque no tenga perfil
+                // eliminamos la cuenta de firebase auth
+                // sin esto el paciente podria seguir autenticandose aunque ya no tenga perfil
                 if (uidToDelete != null && !uidToDelete.isEmpty()) {
                     FirebaseAuth.getInstance().deleteUser(uidToDelete);
                     System.out.println("[PatientsController] Auth eliminado — UID: " + uidToDelete);
                 }
 
-                // Eliminar perfil de Firestore
+                // eliminamos el perfil de firestore
                 userDao.delete(uidToDelete);
 
                 Platform.runLater(() -> { onClearForm(); loadPatients(); });

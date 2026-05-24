@@ -2,7 +2,7 @@ package com.itc.healthtrack.models;
 
 import com.google.cloud.Timestamp;
 
-// representa una medicion de salud registrada por un paciente
+// medicion de salud registrada por un paciente
 public class Metric {
     private String id;
     private String patientId;
@@ -13,14 +13,11 @@ public class Metric {
     private Double weight;
     private Double bmi;
     private Double glucoseLevel;
-    // campos escritos desde la app android que deben existir para evitar warnings de firestore
+    // campos que escribe la app android y deben existir para evitar warnings de firestore
     private String notes;
     private String metricType;
 
-    // constructor vacio requerido por firestore
     public Metric() {}
-
-    // getters y setters
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }

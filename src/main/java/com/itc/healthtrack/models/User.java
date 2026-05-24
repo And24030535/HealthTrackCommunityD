@@ -4,52 +4,42 @@ import java.util.List;
 
 public class User {
 
-    // Identificador único del usuario
     private String uid;
 
-    // Correo electrónico del usuario, también usado como identificador en Firebase Auth
+    // correo del usuario tambien usado como id en firebase auth
     private String email;
 
-    // Nombre del usuario
     private String firstName;
 
-    // Apellido(s) del usuario
     private String lastName;
 
-    // Rol dentro del sistema: "patient", "doctor" o "admin"
+    // rol patient doctor o admin
     private String role;
 
-    // Contraseña almacenada en Firestore (campo heredado — no se usa en la lógica del desktop)
+    // campo heredado no se usa en el desktop
     private String password;
 
-    // Lista de UIDs de pacientes asignados a un médico (campo heredado de documentos existentes)
+    // campo heredado de documentos viejos
     private List<String> patientIds;
 
-    // -------------------------------------------------------------------
-    // Campos exclusivos para pacientes
-    // -------------------------------------------------------------------
+    // campos exclusivos para pacientes
 
-    // Fecha de nacimiento almacenada como texto para simplicidad en FXML (ej: "2000-01-15")
+    // fecha de nacimiento guardada como texto para simplicidad en fxml
     private String birthDate;
 
-    // Género del paciente: "M", "F" u "Otro"
+    // genero M F u Otro
     private String gender;
 
-    // Estatura del paciente en metros (ej: 1.75)
+    // estatura del paciente en metros
     private Double height;
 
-    // UID del médico asignado a este paciente
+    // uid del medico asignado a este paciente
     private String assignedDoctorId;
 
-    // Nombre completo del médico asignado (desnormalizado para mostrar en UI sin consulta extra)
+    // nombre del medico asignado desnormalizado para mostrar sin consulta extra
     private String assignedDoctorName;
 
-    // Constructor vacío requerido por Firestore para deserializar documentos automáticamente
     public User() {}
-
-    // -------------------------------------------------------------------
-    // Getters y Setters
-    // -------------------------------------------------------------------
 
     public String getUid() { return uid; }
     public void setUid(String uid) { this.uid = uid; }
