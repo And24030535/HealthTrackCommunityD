@@ -19,31 +19,35 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-// controlador del panel de admin con estadisticas busqueda eliminacion y cambio de roles
+//Controlador del Panel de Administración
+// Gestiona la visualización de estadísticas de usuarios, búsqueda, eliminación y cambio de roles
 public class AdminController {
 
-    @FXML private Label lblTotalUsers;
-    @FXML private Label lblTotalDoctors;
-    @FXML private Label lblTotalPatients;
-    @FXML private Label lblStatus;
+    // Elementos de la interfaz
+    @FXML private Label lblTotalUsers;      // Etiqueta para mostrar total de usuarios
+    @FXML private Label lblTotalDoctors;    // Etiqueta para mostrar total de médicos
+    @FXML private Label lblTotalPatients;   // Etiqueta para mostrar total de pacientes
+    @FXML private Label lblStatus;          // Etiqueta para mensajes de estado
 
-    @FXML private TableView<User> tableUsers;
-    @FXML private TableColumn<User, String> colFirstName;
-    @FXML private TableColumn<User, String> colLastName;
-    @FXML private TableColumn<User, String> colEmail;
-    @FXML private TableColumn<User, String> colRole;
-    @FXML private TableColumn<User, String> colAssignedDoctor;
-    @FXML private TextField txtSearch;
-    @FXML private ComboBox<String> cbRoleFilter;
+    // Tabla de columnas
+    @FXML private TableView<User> tableUsers;                    // Tabla principal de usuarios
+    @FXML private TableColumn<User, String> colFirstName;        // Columna: Nombre
+    @FXML private TableColumn<User, String> colLastName;         // Columna: Apellido
+    @FXML private TableColumn<User, String> colEmail;            // Columna: Correo
+    @FXML private TableColumn<User, String> colRole;             // Columna: Rol
+    @FXML private TableColumn<User, String> colAssignedDoctor;   // Columna: Doctor Asignado
+    @FXML private TextField txtSearch;                           // Campo de búsqueda
+    @FXML private ComboBox<String> cbRoleFilter;                 // Filtro por rol
 
+    // Datos y controladores
     private final GenericDAO<User> userDao = new GenericDAO<>(User.class, "users");
-    private final ObservableList<User> usersObservableList = FXCollections.observableArrayList();
-    private FilteredList<User> filteredList;
+    private final ObservableList<User> usersObservableList = FXCollections.observableArrayList();  // Lista observable de usuarios
+    private FilteredList<User> filteredList;                     // Lista filtrada para búsqueda
 
-    private User loggedInAdmin;
-    private User selectedUser = null;
+    private User loggedInAdmin;             // Usuario administrador logeado
+    private User selectedUser = null;       // Usuario seleccionado en la tabla
 
-    // traduce el rol interno al texto que ve el usuario
+    // Metodo para traducir variable a vista del usuario
     private String translateRole(String role) {
         if (role == null) return "—";
         switch (role) {
@@ -64,44 +68,48 @@ public class AdminController {
         }
     }
 
-    // inicializa el controlador y carga la lista de usuarios
+    /*Inicializa el controlador con los datos del administrador logeado
+     Configura la interfaz y carga la lista de usuarios  */
     public void initData(User admin) {
         this.loggedInAdmin = admin;
-        setupSearchControls();
-        setupTable();
-        loadAllUsers();
+        setupSearchControls();   // Configura los controles de búsqueda
+        setupTable();            // Configura las columnas de la tabla
+        loadAllUsers();          // Carga todos los usuarios desde Firestore
     }
 
-    // configura el filtro de roles para buscar rapido
+    /*Configura el filtro de roles (Todos, Doctor, Paciente, Admin)
+    esto permite filtrar usuarios por su rol de forma rápida*/
     private void setupSearchControls() {
         cbRoleFilter.setItems(FXCollections.observableArrayList("Todos", "Paciente", "Doctor", "Admin"));
-        cbRoleFilter.setValue("Todos");
+        cbRoleFilter.setValue("Todos");  // Por defecto muestra todos
     }
 
-    // configura las columnas y el listener para detectar la seleccion
+    /*Configura las columnas de la tabla para mostrar datos de los usuarios
+    , también configura el escuchador para detectar cuando se selecciona un usuario*/
     private void setupTable() {
+        // Vincula cada columna con su propiedad correspondiente del modelo User
         colFirstName.setCellValueFactory(new PropertyValueFactory<>("firstName"));
         colLastName.setCellValueFactory(new PropertyValueFactory<>("lastName"));
         colEmail.setCellValueFactory(new PropertyValueFactory<>("email"));
-        colRole.setCellValueFactory(new PropertyValueFactory<>("role"));
-        colRole.setCellFactory(column -> new TableCell<User, String>() {
+        colRole.setCellValueFactory(new PropertyValueFactory<>("role"));      // obtiene el dato
+        colRole.setCellFactory(column -> new TableCell<User, String>() { //traduce
             @Override
             protected void updateItem(String role, boolean empty) {
                 super.updateItem(role, empty);
                 if (empty || role == null) {
                     setText(null);
                 } else {
-                    setText(translateRole(role));
+                    setText(translateRole(role));  // Usa el método auxiliar
                 }
             }
         });
         colAssignedDoctor.setCellValueFactory(new PropertyValueFactory<>("assignedDoctorName"));
 
-        // lista filtrable a partir de la lista de usuarios
+        // Crea una lista filtrable a partir de la lista de usuarios
         filteredList = new FilteredList<>(usersObservableList, u -> true);
         tableUsers.setItems(filteredList);
 
-        // cuando se selecciona un usuario en la tabla guardamos la seleccion
+        // cuando se selecciona un usuario en la tabla, se guarda la selección
         tableUsers.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null) {
                 selectedUser = newVal;
@@ -111,33 +119,36 @@ public class AdminController {
         });
     }
 
-    // carga todos los usuarios en hilo de fondo y actualiza tabla y estadisticas
-    // mapea el nombre del medico asignado a cada paciente para mostrarlo legible
+    /*Carga todos los usuarios desde la base de datos (Firestore) en un hilo de fondo.
+     Luego actualiza la tabla y las estadísticas en el hilo principal de la interfaz.
+     mapea el nombre de cada médico asignado a los pacientes para que aparezca de forma legible en la columna "Doctor Asignado" */
     private void loadAllUsers() {
         new Thread(() -> {
             try {
+                // Obtiene todos los usuarios de Firestore
                 List<User> allUsers = userDao.getAll();
 
-                // mapa para convertir uid de medico a su nombre completo
+                // Crea un mapa para convertir IDs de médicos a sus nombres
                 Map<String, String> doctorNameMap = new HashMap<>();
 
+                // Llena el mapa
                 for (User user : allUsers) {
                     if ("doctor".equals(user.getRole())) {
                         doctorNameMap.put(user.getUid(), user.getFirstName() + " " + user.getLastName());
                     }
                 }
 
-                // asigna el nombre del medico a cada paciente
+                // Asigna el nombre del médico a cada paciente
                 for (User user : allUsers) {
                     if ("patient".equals(user.getRole()) && user.getAssignedDoctorId() != null) {
                         String doctorName = doctorNameMap.get(user.getAssignedDoctorId());
                         user.setAssignedDoctorName(doctorName != null ? doctorName : "—");
                     } else if ("patient".equals(user.getRole())) {
-                        user.setAssignedDoctorName("—");
+                        user.setAssignedDoctorName("—");  // Sin médico asignado
                     }
                 }
 
-                // cuenta medicos y pacientes
+                // Cuenta cuántos médicos y pacientes hay
                 int doctors = 0;
                 int patients = 0;
                 for (User user : allUsers) {
@@ -148,18 +159,21 @@ public class AdminController {
                         patients++;
                     }
                 }
+                // Copias finales para usarlas dentro del hilo de la interfaz
                 final int doctorCount = doctors;
                 final int patientCount = patients;
 
+                // Ejecuta en el hilo de la interfaz gráfica
                 Platform.runLater(() -> {
                     usersObservableList.clear();
                     usersObservableList.addAll(allUsers);
 
+                    // Actualiza las etiquetas de estadísticas
                     lblTotalUsers.setText(String.valueOf(allUsers.size()));
                     lblTotalDoctors.setText(String.valueOf(doctorCount));
                     lblTotalPatients.setText(String.valueOf(patientCount));
 
-                    applyFilter();
+                    applyFilter();  // Aplica el filtro actual
                     lblStatus.setText("Lista actualizada\n" + allUsers.size() + " usuario(s) encontrado(s)");
                 });
 
@@ -173,35 +187,43 @@ public class AdminController {
         }).start();
     }
 
-    // se ejecuta al hacer clic en buscar
+    /* Se ejecuta cuando el usuario hace clic en el botón "Buscar"
+     Aplica los filtros de búsqueda y rol a la tabla*/
     @FXML
     protected void onSearch() {
         applyFilter();
     }
 
-    // aplica los filtros de busqueda y rol a la tabla
+    // Aplica filtros a la tabla
     private void applyFilter() {
+        // Obtiene el texto de búsqueda, limpiado y en minúsculas
         String keyword    = txtSearch.getText() == null ? "" : txtSearch.getText().trim().toLowerCase();
         String roleFilter = cbRoleFilter.getValue();
 
+        // Convierte el rol del ComboBox al valor de la BD
         String roleValue = getRoleValue(roleFilter);
 
+        // Establece la condición de filtro
         filteredList.setPredicate(user -> {
+            // Verifica que el rol coincida (o si está marcado "Todos")
             boolean roleMatch = "Todos".equals(roleFilter) || roleValue.equals(user.getRole());
 
+            // Verifica que el texto sea encontrado en nombre, apellido o correo
             boolean textMatch = keyword.isEmpty()
                     || (user.getFirstName() != null && user.getFirstName().toLowerCase().contains(keyword))
                     || (user.getLastName()  != null && user.getLastName().toLowerCase().contains(keyword))
                     || (user.getEmail()     != null && user.getEmail().toLowerCase().contains(keyword));
 
-            return roleMatch && textMatch;
+            return roleMatch && textMatch;  // Ambos deben cumplirse
         });
 
+        // Muestra cuántos usuarios se están mostrando
         lblStatus.setText("Mostrando " + filteredList.size() + " de " + usersObservableList.size() + " usuario(s).");
         lblStatus.setTextFill(Color.web("#aaaaaa"));
     }
 
-    // limpia el campo de busqueda y vuelve a Todos
+    /* Se ejecuta cuando el usuario hace clic en el botón "Limpiar"
+     Limpia el campo de búsqueda y resetea el filtro a "Todos"*/
     @FXML
     protected void onClearSearch() {
         txtSearch.clear();
@@ -209,7 +231,10 @@ public class AdminController {
         applyFilter();
     }
 
-    // abre un dialogo con todos los detalles del usuario seleccionado
+    // ver detalles de un usuario
+
+    /* Abre un diálogo que muestra todos los detalles del usuario seleccionado.
+     Muestra información diferente según el rol (paciente, médico, admin)  */
     @FXML
     protected void onViewDetails() {
         if (selectedUser == null) {
@@ -237,7 +262,7 @@ public class AdminController {
         row = addDetailRow(grid, row, "Correo",   selectedUser.getEmail());
         row = addDetailRow(grid, row, "Nombre",   selectedUser.getFirstName());
         row = addDetailRow(grid, row, "Apellido", selectedUser.getLastName());
-        row = addDetailRow(grid, row, "Rol",      translateRole(selectedUser.getRole()));
+        row = addDetailRow(grid, row, "Rol",      translateRole(selectedUser.getRole())); // Traduce el rol
 
         if ("patient".equals(selectedUser.getRole())) {
             row = addDetailRow(grid, row, "Nacimiento", selectedUser.getBirthDate());
@@ -268,26 +293,27 @@ public class AdminController {
         dp.setHeader(null);
         dp.setGraphic(null);
         dp.getButtonTypes().add(ButtonType.CLOSE);
-        applyWhiteDialogStyle(dp);
+        DialogUtils.applyWhiteStyle(dp);
 
         dialog.showAndWait();
     }
 
-    // agrega una fila label valor al gridpane
+    /*Metodo auxiliar que agrega una fila de detalle al GridPane
+    Cada fila tiene una etiqueta (label) y un valor (value)*/
     private int addDetailRow(GridPane grid, int row, String label, String value) {
         Label lbl = new Label(label + ":");
         lbl.setStyle("-fx-text-fill: #aaaaaa; -fx-font-weight: bold;");
 
         Label val = new Label(value != null && !value.isBlank() ? value : "—");
         val.setStyle("-fx-text-fill: #000000;");
-        val.setWrapText(true);
+        val.setWrapText(true);  // Permite que el texto se envuelva si es muy largo
 
-        grid.add(lbl, 0, row);
-        grid.add(val, 1, row);
-        return row + 1;
+        grid.add(lbl, 0, row);   // Etiqueta en columna 0
+        grid.add(val, 1, row);   // Valor en columna 1
+        return row + 1;          // Devuelve la siguiente fila disponible
     }
 
-    // punto de entrada para eliminar separa el flujo de medico del de otros roles
+    // Punto de entrada para eliminación: separa lógica de médico vs. otros roles
     @FXML
     protected void onDeleteUser() {
         if (selectedUser == null) {
@@ -295,13 +321,13 @@ public class AdminController {
             lblStatus.setTextFill(Color.web("#ff5252"));
             return;
         }
-        // el admin no puede eliminarse a si mismo
+        // El admin no puede eliminarse a sí mismo
         if (selectedUser.getUid() != null && selectedUser.getUid().equals(loggedInAdmin.getUid())) {
             lblStatus.setText("No puedes eliminar tu propia cuenta de administrador.");
             lblStatus.setTextFill(Color.web("#ff9800"));
             return;
         }
-        // los medicos requieren reasignacion obligatoria antes de eliminarse
+        // Los médicos requieren reasignación obligatoria antes de poder eliminarse
         if ("doctor".equals(selectedUser.getRole())) {
             handleDoctorDeletion();
         } else {
@@ -309,7 +335,7 @@ public class AdminController {
         }
     }
 
-    // checa cuantos pacientes tiene el medico y decide el flujo de eliminacion
+    // Verifica cuántos pacientes tiene el médico y decide el flujo de eliminación
     private void handleDoctorDeletion() {
         lblStatus.setText("Verificando pacientes asignados al médico...");
         lblStatus.setTextFill(Color.web("#aaaaaa"));
@@ -319,18 +345,18 @@ public class AdminController {
 
         new Thread(() -> {
             try {
-                // consultamos los pacientes del medico y los otros medicos disponibles
+                // Consultamos los pacientes del médico y los demás médicos disponibles
                 List<User> linkedPatients = getPatientsByDoctorId(doctorId);
                 List<User> otherDoctors   = userDao.getByField("role", "doctor");
-                // quitamos al medico que se va a eliminar de la lista de opciones
+                // Quitamos al médico que se va a eliminar de la lista de opciones
                 otherDoctors.removeIf(d -> doctorId.equals(d.getUid()));
 
                 Platform.runLater(() -> {
                     if (linkedPatients.isEmpty()) {
-                        // sin pacientes solo confirmamos
+                        // Sin pacientes: confirmación simple
                         showSimpleDoctorDeleteDialog(doctorName, doctorId);
                     } else {
-                        // con pacientes hay que reasignar antes
+                        // Con pacientes: reasignación obligatoria antes de eliminar
                         showReassignmentDialog(doctorName, doctorId, linkedPatients, otherDoctors);
                     }
                 });
@@ -344,24 +370,24 @@ public class AdminController {
         }).start();
     }
 
-    // dialogo donde el admin elige el medico receptor antes de confirmar la eliminacion
+    // Diálogo de reasignación: el admin elige el médico receptor antes de confirmar eliminación
     private void showReassignmentDialog(String doctorName, String doctorId,
                                         List<User> patients, List<User> otherDoctors) {
-        // si no hay otro medico bloqueamos la eliminacion
+        // Si no hay otro médico disponible, bloqueamos la eliminación
         if (otherDoctors.isEmpty()) {
             Alert blocked = new Alert(Alert.AlertType.WARNING);
             blocked.setTitle("Eliminación bloqueada");
             blocked.setHeaderText("El Dr. " + doctorName + " tiene " + patients.size() + " paciente(s) asignado(s)");
             blocked.setContentText("No hay otros médicos disponibles para recibir los pacientes.\n"
                     + "Registra al menos un médico más antes de intentar esta eliminación.");
-            applyWhiteDialogStyle(blocked.getDialogPane());
+            DialogUtils.applyWhiteStyle(blocked.getDialogPane());
             blocked.showAndWait();
             lblStatus.setText("Eliminación cancelada: no hay médicos disponibles para reasignación.");
             lblStatus.setTextFill(Color.web("#ff9800"));
             return;
         }
 
-        // combobox con los medicos que pueden recibir los pacientes
+        // ComboBox con los médicos que pueden recibir los pacientes
         ComboBox<User> comboNuevoDoc = new ComboBox<>();
         comboNuevoDoc.setMaxWidth(Double.MAX_VALUE);
         comboNuevoDoc.setItems(FXCollections.observableArrayList(otherDoctors));
@@ -392,7 +418,7 @@ public class AdminController {
         dialog.setHeaderText("Reasignar pacientes antes de eliminar al médico");
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-        applyWhiteDialogStyle(dialog.getDialogPane());
+        DialogUtils.applyWhiteStyle(dialog.getDialogPane());
 
         dialog.showAndWait().ifPresent(btn -> {
             if (btn != ButtonType.OK) return;
@@ -405,24 +431,24 @@ public class AdminController {
 
             new Thread(() -> {
                 try {
-                    // ids de los pacientes que se van a reasignar
+                    // Recopilamos los IDs de los pacientes que se reasignarán
                     List<String> patientIds = new ArrayList<>();
                     for (User p : patients) patientIds.add(p.getUid());
 
-                    // campos a actualizar en cada paciente
+                    // Preparamos los campos a actualizar en cada paciente
                     Map<String, Object> campos = new HashMap<>();
                     campos.put("assignedDoctorId",   nuevoMedico.getUid());
                     campos.put("assignedDoctorName",
                             nuevoMedico.getFirstName() + " " + nuevoMedico.getLastName());
 
-                    // batch atomico todos los pacientes se actualizan en una sola operacion
+                    // Batch Update atómico: todos los pacientes se actualizan en una sola operación
                     userDao.batchUpdateFields(patientIds, campos);
 
-                    // solo despues de confirmar el batch eliminamos al medico
+                    // Solo después de confirmar el batch, eliminamos al médico
                     userDao.delete(doctorId);
 
                     Platform.runLater(() -> {
-                        // actualizamos la lista local sin recargar todo desde firestore
+                        // Actualizar la lista local sin recargar todo desde Firestore
                         for (User p : patients) {
                             p.setAssignedDoctorId(nuevoMedico.getUid());
                             p.setAssignedDoctorName(
@@ -449,13 +475,13 @@ public class AdminController {
         });
     }
 
-    // confirmacion simple cuando el medico no tiene pacientes
+    // Confirmación simple cuando el médico no tiene pacientes — solo pide confirmar
     private void showSimpleDoctorDeleteDialog(String doctorName, String doctorId) {
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
         confirm.setTitle("Confirmar eliminación");
         confirm.setHeaderText("Eliminar al Dr. " + doctorName);
         confirm.setContentText("Este médico no tiene pacientes asignados.\n¿Confirmas la eliminación?");
-        applyWhiteDialogStyle(confirm.getDialogPane());
+        DialogUtils.applyWhiteStyle(confirm.getDialogPane());
 
         confirm.showAndWait().ifPresent(result -> {
             if (result != ButtonType.OK) return;
@@ -463,7 +489,7 @@ public class AdminController {
                 try {
                     userDao.delete(doctorId);
                     Platform.runLater(() -> {
-                        // eliminamos al medico de la lista local sin recargar firestore
+                        // Eliminar al médico de la lista local sin recargar Firestore
                         usersObservableList.removeIf(u -> doctorId.equals(u.getUid()));
                         tableUsers.refresh();
                         selectedUser = null;
@@ -484,14 +510,14 @@ public class AdminController {
         });
     }
 
-    // confirmacion simple para pacientes y admins sin reasignacion
+    // Confirmación simple para pacientes y admins — sin lógica de reasignación
     private void handleNonDoctorDeletion() {
         String userName = selectedUser.getFirstName() + " " + selectedUser.getLastName();
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
         confirm.setTitle("Confirmar eliminación");
         confirm.setHeaderText("Eliminar usuario");
         confirm.setContentText("¿Eliminar al usuario " + userName + "?\n\nEsta acción no se puede deshacer.");
-        applyWhiteDialogStyle(confirm.getDialogPane());
+        DialogUtils.applyWhiteStyle(confirm.getDialogPane());
 
         confirm.showAndWait().ifPresent(result -> {
             if (result != ButtonType.OK) return;
@@ -502,7 +528,7 @@ public class AdminController {
                 try {
                     userDao.delete(userId);
                     Platform.runLater(() -> {
-                        // eliminamos al usuario de la lista local sin recargar firestore
+                        // Eliminar al usuario de la lista local sin recargar Firestore
                         usersObservableList.removeIf(u -> userId.equals(u.getUid()));
                         tableUsers.refresh();
                         selectedUser = null;
@@ -523,7 +549,8 @@ public class AdminController {
         });
     }
 
-    // cambia el rol del usuario seleccionado
+    // Cambiar rol de un usuario
+    // Después de cambiar, recarga la lista de usuarios para reflejar el cambio.
     @FXML
     protected void onChangeRole() {
         if (selectedUser == null) {
@@ -532,29 +559,31 @@ public class AdminController {
             return;
         }
 
-        // dialogo con los roles disponibles en espanol
+        // Crea un diálogo de opciones con los roles disponibles en español
         ChoiceDialog<String> dialog = new ChoiceDialog<>(translateRole(selectedUser.getRole()),
                 "Paciente", "Doctor", "Admin");
         dialog.setTitle("Cambiar Rol");
         dialog.setHeaderText("Usuario: " + selectedUser.getFirstName() + " " + selectedUser.getLastName());
         dialog.setContentText("Selecciona el nuevo rol:");
-        applyWhiteDialogStyle(dialog.getDialogPane());
+        DialogUtils.applyWhiteStyle(dialog.getDialogPane());
 
+        // Si el usuario elige un nuevo rol
         dialog.showAndWait().ifPresent(newRoleLabel -> {
-            String newRole = getRoleValue(newRoleLabel);
-            // si selecciono el mismo rol no hacemos nada
+            String newRole = getRoleValue(newRoleLabel);  // Convierte a inglés
+            // Si seleccionó el mismo rol, no hace nada
             if (newRole.equals(selectedUser.getRole())) return;
 
+            // Actualiza el rol en la base de datos
             new Thread(() -> {
                 try {
                     selectedUser.setRole(newRole);
                     userDao.save(selectedUser.getUid(), selectedUser);
                     Platform.runLater(() -> {
-                        // actualizamos el rol en la lista local sin recargar firestore
+                        // Actualizar el rol en la lista local sin recargar Firestore
                         tableUsers.refresh();
                         refreshStats();
                         applyFilter();
-                        lblStatus.setText("Rol actualizado a: " + newRoleLabel);
+                        lblStatus.setText("Rol actualizado a: " + newRoleLabel); // Muestra en español
                         lblStatus.setTextFill(Color.web("#4caf50"));
                     });
                 } catch (Exception e) {
@@ -568,7 +597,7 @@ public class AdminController {
         });
     }
 
-    // asigna un medico al paciente seleccionado
+    // Asigna un médico a un paciente seleccionado desde la tabla
     @FXML
     protected void onAssignDoctor() {
         if (selectedUser == null || !"patient".equals(selectedUser.getRole())) {
@@ -577,7 +606,7 @@ public class AdminController {
             return;
         }
 
-        // cargamos la lista de medicos en hilo de fondo antes de mostrar el dialogo
+        // Cargamos la lista de médicos en un hilo de fondo antes de mostrar el diálogo
         lblStatus.setText("Cargando médicos disponibles...");
         lblStatus.setTextFill(Color.web("#aaaaaa"));
 
@@ -592,12 +621,12 @@ public class AdminController {
                         return;
                     }
 
-                    // combobox con todos los medicos disponibles
+                    // ComboBox con todos los médicos disponibles
                     ComboBox<User> comboDoc = new ComboBox<>();
                     comboDoc.setMaxWidth(Double.MAX_VALUE);
                     comboDoc.setItems(FXCollections.observableArrayList(doctors));
 
-                    // muestra el nombre completo de cada medico en la lista
+                    // Muestra el nombre completo de cada médico en la lista
                     comboDoc.setCellFactory(lv -> new ListCell<User>() {
                         @Override protected void updateItem(User u, boolean empty) {
                             super.updateItem(u, empty);
@@ -611,12 +640,14 @@ public class AdminController {
                         }
                     });
 
-                    // preseleccionamos al medico actual del paciente si ya tiene uno
+                    // Pre-seleccionamos al médico actual del paciente si ya tiene uno
                     if (selectedUser.getAssignedDoctorId() != null) {
-                        doctors.stream()
-                               .filter(d -> selectedUser.getAssignedDoctorId().equals(d.getUid()))
-                               .findFirst()
-                               .ifPresent(comboDoc::setValue);
+                        for (User d : doctors) {
+                            if (selectedUser.getAssignedDoctorId().equals(d.getUid())) {
+                                comboDoc.setValue(d);
+                                break;
+                            }
+                        }
                     }
 
                     VBox content = new VBox(10,
@@ -633,7 +664,7 @@ public class AdminController {
                     dialog.setHeaderText("Asignación de médico al paciente");
                     dialog.getDialogPane().setContent(content);
                     dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-                    applyWhiteDialogStyle(dialog.getDialogPane());
+                    DialogUtils.applyWhiteStyle(dialog.getDialogPane());
 
                     dialog.showAndWait().ifPresent(btn -> {
                         if (btn != ButtonType.OK) return;
@@ -641,7 +672,7 @@ public class AdminController {
                         User chosenDoctor = comboDoc.getValue();
                         if (chosenDoctor == null) return;
 
-                        // actualizamos el paciente en firestore con el nuevo medico
+                        // Actualizamos el paciente en Firestore con el nuevo médico
                         selectedUser.setAssignedDoctorId(chosenDoctor.getUid());
                         selectedUser.setAssignedDoctorName(chosenDoctor.getFirstName() + " " + chosenDoctor.getLastName());
 
@@ -649,7 +680,7 @@ public class AdminController {
                             try {
                                 userDao.save(selectedUser.getUid(), selectedUser);
                                 Platform.runLater(() -> {
-                                    // actualizamos el nombre del medico en la lista local sin recargar firestore
+                                    // Actualizar el nombre del médico en la lista local sin recargar Firestore
                                     tableUsers.refresh();
                                     applyFilter();
                                     lblStatus.setText("Médico asignado correctamente: Dr. " + chosenDoctor.getLastName());
@@ -675,12 +706,14 @@ public class AdminController {
         }).start();
     }
 
-    // trae los pacientes asignados a un medico consultando por campo directo
+    // Obtiene la lista de pacientes asignados a un médico específico.
+    // Usa la consulta directa por campo en lugar de cargar todos y filtrar en memoria.
     private List<User> getPatientsByDoctorId(String doctorId) throws Exception {
         return userDao.getByField("assignedDoctorId", doctorId);
     }
 
-    // recalcula los totales con la lista local sin volver a consultar firestore
+    // Recalcula las etiquetas de estadísticas a partir de la lista observable actual,
+    // sin hacer ninguna consulta adicional a Firestore.
     private void refreshStats() {
         int totalDoctors  = 0;
         int totalPatients = 0;
@@ -691,11 +724,6 @@ public class AdminController {
         lblTotalUsers.setText(String.valueOf(usersObservableList.size()));
         lblTotalDoctors.setText(String.valueOf(totalDoctors));
         lblTotalPatients.setText(String.valueOf(totalPatients));
-    }
-
-    // delega el estilo de los dialogos a DialogUtils para no duplicar codigo
-    private void applyWhiteDialogStyle(DialogPane dp) {
-        DialogUtils.applyWhiteStyle(dp);
     }
 
 }

@@ -1,45 +1,43 @@
 package com.itc.healthtrack.models;
 
-import java.util.List;
-
 public class User {
 
+    // Identificador único del usuario
     private String uid;
 
-    // correo del usuario tambien usado como id en firebase auth
+    // Correo electrónico del usuario, también usado como identificador en Firebase Auth
     private String email;
 
+    // Nombre del usuario
     private String firstName;
 
+    // Apellido(s) del usuario
     private String lastName;
 
-    // rol patient doctor o admin
+    // Rol dentro del sistema: "patient", "doctor" o "admin"
     private String role;
 
-    // campo heredado no se usa en el desktop
-    private String password;
+    // Campos exclusivos para pacientes
 
-    // campo heredado de documentos viejos
-    private List<String> patientIds;
-
-    // campos exclusivos para pacientes
-
-    // fecha de nacimiento guardada como texto para simplicidad en fxml
+    // Fecha de nacimiento almacenada como texto para simplicidad en FXML (ej: "2000-01-15")
     private String birthDate;
 
-    // genero M F u Otro
+    // Género del paciente: "M", "F" u "Otro"
     private String gender;
 
-    // estatura del paciente en metros
+    // Estatura del paciente en metros (ej: 1.75)
     private Double height;
 
-    // uid del medico asignado a este paciente
+    // UID del médico asignado a este paciente
     private String assignedDoctorId;
 
-    // nombre del medico asignado desnormalizado para mostrar sin consulta extra
+    // Nombre completo del médico asignado (desnormalizado para mostrar en UI sin consulta extra)
     private String assignedDoctorName;
 
+    // Constructor vacío requerido por Firestore para deserializar documentos automáticamente
     public User() {}
+
+    // Getters y Setters
 
     public String getUid() { return uid; }
     public void setUid(String uid) { this.uid = uid; }
@@ -70,12 +68,6 @@ public class User {
 
     public String getAssignedDoctorName() { return assignedDoctorName; }
     public void setAssignedDoctorName(String assignedDoctorName) { this.assignedDoctorName = assignedDoctorName; }
-
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
-
-    public List<String> getPatientIds() { return patientIds; }
-    public void setPatientIds(List<String> patientIds) { this.patientIds = patientIds; }
 
     @Override
     public String toString() {
