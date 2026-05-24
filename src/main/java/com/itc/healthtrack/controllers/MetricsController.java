@@ -22,57 +22,50 @@ import javafx.scene.paint.Color;
 import java.util.ArrayList;
 import java.util.List;
 
+// controlador de las metricas registra lee y grafica datos clinicos segun el rol del usuario logeado
 public class MetricsController {
 
-    // Componentes de la interfaz de usuario
     @FXML private ComboBox<User> comboPatients;
     @FXML private TextField txtSystolic, txtDiastolic, txtHeartRate, txtGlucose, txtWeight;
     @FXML private Button btnSave;
     @FXML private Label lblStatus;
 
-    // Filtros y promedios
+    // filtros y promedios
     @FXML private ComboBox<String> comboTimeFilter;
     @FXML private Label lblAvgBP, lblAvgGlucose, lblAvgWeight;
 
-    // Tabla y gráficos
-    @FXML private TableView<Metric> tableMetrics;                 // Tabla de historial de métricas
-    @FXML private TableColumn<Metric, String> colDate, colSysDia;  // Columnas: Fecha y Presión (Sis/Dia)
+    // tabla y graficos
+    @FXML private TableView<Metric> tableMetrics;
+    @FXML private TableColumn<Metric, String> colDate, colSysDia;
     @FXML private TableColumn<Metric, String> colHeartRate, colGlucose, colWeight;
-    @FXML private LineChart<String, Number> evolutionChart;       // Gráfico de línea: Evolución de presión
-    @FXML private BarChart<String, Number> averagesChart;         // Gráfico de barras: Promedios
+    @FXML private LineChart<String, Number> evolutionChart;
+    @FXML private BarChart<String, Number> averagesChart;
 
-    // Acceso a la base de datos y servicios
     private final GenericDAO<Metric> metricDao = new GenericDAO<>(Metric.class, "metrics");
     private final GenericDAO<User> userDao = new GenericDAO<>(User.class, "users");
     private final NotificationService notificationService = new NotificationService();
     private final UserService userService = new UserService();
     private final ObservableList<Metric> metricsObservableList = FXCollections.observableArrayList();
 
-    // Estado del controlador
-    private User loggedInDoctor;                                   // Usuario actualmente logeado
-    private Metric selectedMetric = null;                          // Métrica seleccionada en la tabla
-    private List<Metric> currentPatientHistory = new ArrayList<>();  // Respaldo del historial completo
+    private User loggedInDoctor;
+    private Metric selectedMetric = null;
+    // respaldo del historial completo del paciente actual
+    private List<Metric> currentPatientHistory = new ArrayList<>();
 
-    /*
-     Inicializa el controlador con los datos del usuario logeado
-     Configura la tabla y carga los pacientes según el rol
-     - Pacientes solo ven sus propias métricas
-     - Médicos ven sus pacientes asignados
-     - Admins ven todos los pacientes
-     */
+    // arranca el controlador y configura la tabla y los pacientes visibles segun rol pacientes solo se ven a si mismos medicos ven sus asignados y admins ven todos
     public void initData(User user) {
         this.loggedInDoctor = user;
         setupTable();
         setupFilters();
 
         if ("patient".equals(user.getRole())) {
-            // El paciente solo puede ver y registrar sus propias métricas
+            // el paciente solo puede ver y registrar sus propias metricas
             comboPatients.getItems().add(user);
             comboPatients.getSelectionModel().selectFirst();
             comboPatients.setDisable(true);
             loadMetricsForPatient(user.getUid());
         } else {
-            // Médicos y admins ven la lista desplegable de sus pacientes asignados
+            // medicos y admins ven el desplegable con sus pacientes
             loadPatientsIntoCombo();
             comboPatients.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
                 if (newVal != null) {
@@ -84,20 +77,18 @@ public class MetricsController {
     }
 
     private void setupFilters() {
-        // Configurar opciones de filtro de período
+        // opciones del filtro de periodo
         comboTimeFilter.setItems(FXCollections.observableArrayList("Historial Completos", "Últimos 7 Días", "Últimos 30 Días"));
         comboTimeFilter.getSelectionModel().selectFirst();
 
-        // Escuchador: cuando cambia el filtro, recargar datos
+        // cuando cambia el filtro recargamos los datos
         comboTimeFilter.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             applyTimeFilter();
         });
     }
 
-    // Configura las columnas de la tabla y establece escuchadores de evento
-    // También inicializa los gráficos de línea y barras
+    // configura las columnas de la tabla y los listeners de seleccion
     private void setupTable() {
-        // Configurar el formato de las columnas de la tabla
         colDate.setCellValueFactory(cellData -> {
             Timestamp ts = cellData.getValue().getTimestamp();
             return new SimpleStringProperty(ts != null ? ts.toDate().toString().substring(0, 19) : "N/A");
@@ -118,7 +109,7 @@ public class MetricsController {
 
         tableMetrics.setItems(metricsObservableList);
 
-        // Cuando se selecciona una fila, llenar el formulario y cambiar botón a "Actualizar"
+        // cuando se selecciona una fila llenamos el formulario y cambiamos el boton a Actualizar
         tableMetrics.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
             if (newSelection != null) {
                 selectedMetric = newSelection;
@@ -133,7 +124,7 @@ public class MetricsController {
         });
     }
 
-    // Carga la lista de pacientes visibles para el usuario logeado en el ComboBox
+    // carga los pacientes visibles para el usuario logeado en el combobox
     private void loadPatientsIntoCombo() {
         new Thread(() -> {
             try {
@@ -145,15 +136,15 @@ public class MetricsController {
         }).start();
     }
 
-    /*Carga el historial de métricas de un paciente desde Firestore
-     Se ejecuta en un hilo secundario para no bloquear la interfaz*/
+    // carga el historial de metricas de un paciente desde firestore en un hilo de fondo
     private void loadMetricsForPatient(String patientId) {
         new Thread(() -> {
             try {
                 List<Metric> history = getMetricsByPatientId(patientId);
                 Platform.runLater(() -> {
-                    currentPatientHistory = history; // Guardar respaldo
-                    applyTimeFilter(); // Aplicar el filtro que a su vez llena la tabla y gráficas
+                    currentPatientHistory = history;
+                    // aplicamos el filtro que se encarga de llenar tabla y graficas
+                    applyTimeFilter();
                     lblStatus.setText("Historial cargado con éxito");
                     lblStatus.setTextFill(Color.web("#4caf50"));
                 });
@@ -166,8 +157,7 @@ public class MetricsController {
         }).start();
     }
 
-    /*Aplica el filtro de período al historial completo de métricas
-     Actualiza la tabla, gráficos y calcula promedios según el filtro seleccionado*/
+    // aplica el filtro de periodo al historial y refresca tabla graficos y promedios
     private void applyTimeFilter() {
         if (currentPatientHistory.isEmpty()) {
             metricsObservableList.clear();
@@ -177,7 +167,7 @@ public class MetricsController {
             return;
         }
 
-        // Obtener el filtro seleccionado y calcular el límite de tiempo
+        // sacamos el filtro y calculamos el limite de tiempo en segundos
         String filter = comboTimeFilter.getValue();
         long nowSeconds = System.currentTimeMillis() / 1000;
         long limitSeconds = 0;
@@ -185,11 +175,12 @@ public class MetricsController {
         if ("Últimos 7 Días".equals(filter)) limitSeconds = 7 * 24 * 3600;
         else if ("Últimos 30 Días".equals(filter)) limitSeconds = 30 * 24 * 3600;
 
-        // Filtrar las métricas según el período seleccionado
+        // filtramos las metricas segun el periodo
         List<Metric> filteredList = new ArrayList<>();
         for (Metric m : currentPatientHistory) {
             if (m.getTimestamp() == null) {
-                if (limitSeconds == 0) filteredList.add(m); // sin fecha: incluir solo en historial completo
+                // sin fecha solo aparece en el historial completo
+                if (limitSeconds == 0) filteredList.add(m);
                 continue;
             }
             long metricTime = m.getTimestamp().getSeconds();
@@ -198,7 +189,7 @@ public class MetricsController {
             }
         }
 
-        // Actualizar tabla, gráficos y promedios
+        // refrescamos tabla graficos y promedios
         metricsObservableList.clear();
         metricsObservableList.addAll(filteredList);
         updateChart(filteredList);
@@ -206,13 +197,13 @@ public class MetricsController {
         calculateAverages(filteredList);
     }
 
-    //Calcula y muestra los promedios de presión arterial, glucosa y peso para el período de datos actualmente visible
+    // calcula y muestra los promedios de presion glucosa y peso para el periodo visible
     private void calculateAverages(List<Metric> data) {
-        // Delegamos el cálculo a MetricUtils — sólo armamos las etiquetas con el resultado
+        // delegamos el calculo a MetricUtils solo armamos las etiquetas con el resultado
         MetricUtils.Averages avg = MetricUtils.computeAverages(data);
 
         if (avg.systolicAvg != null && avg.diastolicAvg != null) {
-            // Mostramos la presión como enteros (mmHg no usa decimales en la práctica clínica)
+            // mostramos la presion como enteros porque mmHg no usa decimales en clinica
             lblAvgBP.setText("PA: " + avg.systolicAvg.intValue() + "/" + avg.diastolicAvg.intValue() + " mmHg");
         } else {
             lblAvgBP.setText("PA: --/-- mmHg");
@@ -227,8 +218,7 @@ public class MetricsController {
                 : "Peso: -- kg");
     }
 
-    /*Actualiza el gráfico de línea con la evolución de presión arterial.
-     Muestra sistólica y diastólica en series separadas  */
+    // actualiza el grafico de linea con la evolucion de presion sistolica y diastolica en series separadas
     private void updateChart(List<Metric> history) {
         evolutionChart.getData().clear();
 
@@ -238,7 +228,7 @@ public class MetricsController {
         XYChart.Series<String, Number> diastolicSeries = new XYChart.Series<>();
         diastolicSeries.setName("Diastólica");
 
-        // Iteración inversa para mostrar los datos más antiguos a la izquierda
+        // iteramos al reves para que los datos antiguos queden a la izquierda
         for (int i = history.size() - 1; i >= 0; i--) {
             Metric m = history.get(i);
             if (m.getSystolic() != null && m.getDiastolic() != null) {
@@ -251,8 +241,7 @@ public class MetricsController {
         evolutionChart.getData().addAll(systolicSeries, diastolicSeries);
     }
 
-    /*Actualiza el gráfico de barras con los promedios de todas las métricas.
-     Muestra sistólica, diastólica, frecuencia cardíaca, glucosa y peso */
+    // actualiza el grafico de barras con los promedios de todas las metricas
     private void updateBarChart(List<Metric> history) {
         averagesChart.getData().clear();
 
@@ -261,7 +250,7 @@ public class MetricsController {
         XYChart.Series<String, Number> avgSeries = new XYChart.Series<>();
         avgSeries.setName("Promedio del período");
 
-        // Delegamos el conteo y suma a MetricUtils — sólo agregamos al gráfico los promedios con dato
+        // delegamos el conteo y suma a MetricUtils solo agregamos los promedios con dato
         MetricUtils.Averages avg = MetricUtils.computeAverages(history);
         if (avg.systolicAvg  != null) avgSeries.getData().add(new XYChart.Data<>("Sistólica",   avg.systolicAvg));
         if (avg.diastolicAvg != null) avgSeries.getData().add(new XYChart.Data<>("Diastólica",  avg.diastolicAvg));
@@ -272,9 +261,7 @@ public class MetricsController {
         averagesChart.getData().add(avgSeries);
     }
 
-    /*Guarda una nueva métrica o actualiza una existente
-      Calcula automáticamente el IMC si están disponibles peso y altura
-    Evalúa valores clínicos y muestra alertas si se detectan anomalías*/
+    // guarda o actualiza una metrica calcula el imc si hay peso y altura y dispara alertas si hay valores criticos
     @FXML
     protected void onSaveMetric() {
         User selectedPatient = comboPatients.getValue();
@@ -299,12 +286,11 @@ public class MetricsController {
             metricToProcess.setGlucoseLevel(txtGlucose.getText().isEmpty() ? null : Double.parseDouble(txtGlucose.getText()));
             metricToProcess.setWeight(txtWeight.getText().isEmpty() ? null : Double.parseDouble(txtWeight.getText()));
 
-            // Calcular el IMC si están disponibles el peso y la altura
+            // calculamos el imc si tenemos peso y altura
             if (metricToProcess.getWeight() != null && selectedPatient.getHeight() != null
                     && selectedPatient.getHeight() > 0) {
                 double heightM = selectedPatient.getHeight();
-                // Si la altura es mayor a 3.0, se asume que fue ingresada en centímetros (ej: 175)
-                // y se convierte a metros automáticamente (175 → 1.75)
+                // si la altura es mayor a 3.0 asumimos que viene en cm y la pasamos a metros ej 175 a 1.75
                 if (heightM > 3.0) {
                     heightM = heightM / 100.0;
                 }
@@ -315,7 +301,7 @@ public class MetricsController {
             lblStatus.setText(isNewRecord ? "Guardando..." : "Actualizando...");
             lblStatus.setTextFill(Color.web("#ffffff"));
 
-            // Llamamos a una función que revisa si las métricas del paciente tienen valores peligrosos
+            // revisamos si las metricas tienen valores peligrosos antes de guardar
             String alert = evaluateClinicalThresholds(metricToProcess, selectedPatient);
             if (alert != null) {
                 showClinicalAlert(alert);
@@ -324,9 +310,8 @@ public class MetricsController {
             new Thread(() -> {
                 try {
                     if (isNewRecord) {
-                        // Genera un ID nuevo para la métrica
+                        // generamos un id nuevo y guardamos la metrica
                         String newId = metricDao.createDocumentId();
-                        // Asigna el ID al objeto y lo guarda en Firestore
                         metricToProcess.setId(newId);
                         metricDao.save(newId, metricToProcess);
                     } else {
@@ -354,12 +339,11 @@ public class MetricsController {
         }
     }
 
-    /*Evalúa datos y retorna un mensaje de alerta si se detectan valores críticos
-     Verifica presión arterial, glucosa, frecuencia cardíaca e índice de masa corporal    */
+    // checa los datos y regresa un mensaje de alerta cuando detecta valores criticos en presion glucosa frecuencia o imc
     private String evaluateClinicalThresholds(Metric metric, User patient) {
         StringBuilder alert = new StringBuilder();
 
-        // Evaluar presión arterial
+        // presion arterial
         if (metric.getSystolic() != null && metric.getDiastolic() != null) {
             int sys = metric.getSystolic();
             int dia = metric.getDiastolic();
@@ -370,7 +354,7 @@ public class MetricsController {
             }
         }
 
-        // Evaluar glucosa
+        // glucosa
         if (metric.getGlucoseLevel() != null) {
             double gluc = metric.getGlucoseLevel();
             if (gluc > 300) {
@@ -382,7 +366,7 @@ public class MetricsController {
             }
         }
 
-        // Evaluar frecuencia cardíaca
+        // frecuencia cardiaca
         if (metric.getHeartRate() != null) {
             int hr = metric.getHeartRate();
             if (hr > 120) {
@@ -392,7 +376,7 @@ public class MetricsController {
             }
         }
 
-        // Evaluar IMC
+        // imc
         if (metric.getBmi() != null) {
             double bmi = metric.getBmi();
             if (bmi >= 40) {
@@ -405,8 +389,7 @@ public class MetricsController {
         return alert.length() > 0 ? alert.toString().trim() : null;
     }
 
-    /* Muestra un diálogo de alerta clínica en la interfaz.
-     También notifica al paciente y al médico si es aplicable. */
+    // muestra el dialogo de alerta clinica y avisa al paciente y al medico cuando aplica
     private void showClinicalAlert(String message) {
         Platform.runLater(() -> {
             Alert alert = new Alert(Alert.AlertType.WARNING);
@@ -416,23 +399,22 @@ public class MetricsController {
             DialogUtils.applyWhiteStyle(alert.getDialogPane());
             alert.showAndWait();
 
-            // Actualizar etiqueta de estado
             lblStatus.setText("Valores críticos detectados, revisa la alerta");
             lblStatus.setTextFill(Color.web("#ff9800"));
 
-            // Notificar al paciente y al médico
+            // notificamos al paciente y al medico
             User patient = comboPatients.getValue();
             if (patient != null) {
                 notificationService.notifyPatient(patient, "Valores clínicos críticos detectados en tu última medición, consulta a tu médico");
 
                 if (loggedInDoctor != null
                         && ("doctor".equals(loggedInDoctor.getRole()) || "admin".equals(loggedInDoctor.getRole()))) {
-                    // El médico o admin registró la métrica — se notifica directamente
+                    // el medico o admin registro la metrica le avisamos directo
                     notificationService.notifyDoctor(loggedInDoctor, "ALERTA: El paciente "
                             + patient.getFirstName() + " " + patient.getLastName()
                             + " tiene valores críticos registrados");
                 } else if (patient.getAssignedDoctorId() != null && !patient.getAssignedDoctorId().isEmpty()) {
-                    // El paciente registró su propia métrica — buscar al médico asignado y notificarlo
+                    // el paciente registro su propia metrica buscamos al medico asignado y le avisamos
                     final String alertMsg = "ALERTA: El paciente "
                             + patient.getFirstName() + " " + patient.getLastName()
                             + " tiene valores críticos registrados";
@@ -451,7 +433,7 @@ public class MetricsController {
         });
     }
 
-    //Elimina la métrica seleccionada de la base de datos
+    // borra la metrica seleccionada de firestore
     @FXML
     protected void onDeleteMetric() {
         if (selectedMetric == null) {
@@ -480,7 +462,7 @@ public class MetricsController {
         }).start();
     }
 
-    //Limpia todos los campos del formulario y deselecciona la métrica actual
+    // limpia el formulario y deselecciona la metrica actual
     @FXML
     protected void onClearForm() {
         txtSystolic.clear();
@@ -495,7 +477,7 @@ public class MetricsController {
         btnSave.setText("Guardar");
     }
 
-    // Obtiene el historial de métricas de un paciente y lo ordena por fecha
+    // trae el historial de metricas del paciente y lo ordena por fecha
     private List<Metric> getMetricsByPatientId(String patientId) throws Exception {
         List<Metric> metrics = metricDao.getByField("patientId", patientId);
         MetricUtils.sortByTimestampDesc(metrics);

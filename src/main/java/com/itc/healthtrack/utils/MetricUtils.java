@@ -4,16 +4,12 @@ import com.itc.healthtrack.models.Metric;
 
 import java.util.List;
 
-// Utilidad para operaciones comunes sobre listas de métricas.
-// Centraliza el ordenamiento y el cálculo de promedios que antes estaban
-// duplicados en MetricsController y ReportsController.
+// utilidad con operaciones comunes sobre listas de metricas centraliza el orden y los promedios que antes estaban duplicados en MetricsController y ReportsController
 public class MetricUtils {
 
-    // Constructor privado: clase de utilidad, no se instancia
     private MetricUtils() {}
 
-    // Ordena una lista de métricas de más reciente a más antigua (descendente).
-    // Las métricas sin timestamp se colocan al final de la lista.
+    // ordena las metricas de mas reciente a mas antigua las que no tienen timestamp van al final
     public static void sortByTimestampDesc(List<Metric> metrics) {
         metrics.sort((a, b) -> {
             if (a.getTimestamp() == null && b.getTimestamp() == null) return 0;
@@ -23,9 +19,7 @@ public class MetricUtils {
         });
     }
 
-    // Calcula los promedios de las cinco métricas principales del historial recibido.
-    // Devuelve un objeto Averages con cada promedio como Double (null cuando no hubo datos).
-    // Una lectura de presión arterial sólo cuenta cuando sistólica y diastólica están presentes.
+    // calcula los promedios de las cinco metricas principales devuelve null en los campos sin datos la presion solo cuenta cuando sistolica y diastolica estan presentes
     public static Averages computeAverages(List<Metric> data) {
         Averages result = new Averages();
         if (data == null || data.isEmpty()) return result;
@@ -35,7 +29,7 @@ public class MetricUtils {
         int bpCount = 0, hrCount = 0, glCount = 0, weightCount = 0;
 
         for (Metric m : data) {
-            // Sistólica + Diastólica: sólo cuenta como lectura cuando ambas están presentes
+            // sistolica y diastolica solo cuentan cuando ambas vienen juntas
             if (m.getSystolic() != null && m.getDiastolic() != null) {
                 sysTotal += m.getSystolic();
                 diaTotal += m.getDiastolic();
@@ -65,8 +59,7 @@ public class MetricUtils {
         return result;
     }
 
-    // Contenedor simple con los promedios calculados. Un campo en null indica
-    // que no había datos suficientes para calcular ese promedio.
+    // contenedor con los promedios calculados un campo null significa que no habia datos
     public static class Averages {
         public Double systolicAvg;
         public Double diastolicAvg;

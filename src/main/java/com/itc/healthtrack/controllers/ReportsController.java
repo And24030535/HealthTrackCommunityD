@@ -38,14 +38,12 @@ import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-//Controlador encargado de exportar el historial clinico a formatos de reporte (PDF)
+// controlador que exporta el historial clinico a pdf y excel
 public class ReportsController {
 
-    // Elementos de interfaz
-    @FXML private ComboBox<User> comboPatients;  // ComboBox para seleccionar el paciente
-    @FXML private Label lblStatus;               // Etiqueta para mensajes de estado/progreso
+    @FXML private ComboBox<User> comboPatients;
+    @FXML private Label lblStatus;
 
-    // Acceso a datos
     private final GenericDAO<User>           userDao           = new GenericDAO<>(User.class, "users");
     private final GenericDAO<Metric>         metricDao         = new GenericDAO<>(Metric.class, "metrics");
     // tambien cargamos las notas para incluir la ultima recomendacion en el pdf
@@ -53,8 +51,7 @@ public class ReportsController {
     private final UserService userService = new UserService();
     private User loggedInDoctor;
 
-    // inicializa el controlador con el usuario que inicio sesion
-    // si es paciente ve solo sus datos y si es medico o admin ve la lista de pacientes
+    // arranca el controlador con el usuario logeado si es paciente ve solo sus datos si es medico o admin ve la lista de pacientes
     public void initData(User doctor) {
         this.loggedInDoctor = doctor;
         if ("patient".equals(doctor.getRole())) {
@@ -66,7 +63,7 @@ public class ReportsController {
         }
     }
 
-    // Carga la lista de pacientes en el menú desplegable
+    // carga los pacientes en el desplegable
     private void loadPatients() {
         new Thread(() -> {
             try {
@@ -90,30 +87,28 @@ public class ReportsController {
             return;
         }
 
-        // Abre un cuadro de diálogo del sistema operativo para elegir dónde guardar el archivo
+        // abrimos el dialogo del so para elegir donde guardar el archivo
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Guardar Reporte Clínico");
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Archivos PDF", "*.pdf"));
 
-        // Nombre sugerido por defecto
+        // nombre sugerido por defecto
         fileChooser.setInitialFileName("Historial_" + selectedPatient.getFirstName() + ".pdf");
 
-        // Obtener la ventana actual
         Stage stage = (Stage) comboPatients.getScene().getWindow();
         File file = fileChooser.showSaveDialog(stage);
 
-        // Si el usuario eligió una ruta y presionó "Guardar"
+        // si el usuario eligio ruta y presiono Guardar
         if (file != null) {
             lblStatus.setText("Descargando métricas...");
             lblStatus.setTextFill(javafx.scene.paint.Color.WHITE);
 
             new Thread(() -> {
                 try {
-                    // Descargar todo el historial del paciente
+                    // bajamos todo el historial del paciente
                     List<Metric> history = getMetricsByPatientId(selectedPatient.getUid());
 
-                    // Calculamos alertas y obtenemos la última recomendación
-                    // en este mismo hilo de fondo para no bloquear la interfaz
+                    // calculamos alertas y traemos la ultima recomendacion en el mismo hilo de fondo para no bloquear la ui
                     String alertsText          = AlertUtils.buildAlertsText(history);
                     String recommendationText  = fetchLatestRecommendation(selectedPatient.getUid());
 
@@ -122,7 +117,7 @@ public class ReportsController {
                             lblStatus.setText("Generando gráficos...");
                             List<byte[]> chartImages = buildChartImages(history);
 
-                            // Construir el archivo físico en hilo secundario
+                            // construimos el archivo fisico en hilo secundario
                             new Thread(() -> {
                                 try {
                                     generatePDF(file.getAbsolutePath(), selectedPatient, history,
@@ -158,36 +153,36 @@ public class ReportsController {
         }
     }
 
-    // construye el PDF con iText incluyendo tabla de metricas graficos alertas y recomendaciones
+    // construye el pdf con iText con tabla de metricas graficos alertas y recomendaciones
     private void generatePDF(String destPath, User patient, List<Metric> history,
                               List<byte[]> chartImages,
                               String alertsText, String recommendationText) throws Exception {
-        // Inicializar el escritor de PDF
         PdfWriter writer = new PdfWriter(destPath);
         PdfDocument pdf = new PdfDocument(writer);
         Document document = new Document(pdf);
 
-        // Escribir el encabezado del documento
+        // encabezado del documento
         document.add(new Paragraph("Reporte Clínico - HealthTrack Community").setBold().setFontSize(18));
         document.add(new Paragraph("Paciente: " + patient.getFirstName() + " " + patient.getLastName()));
         if (loggedInDoctor != null
                 && ("doctor".equals(loggedInDoctor.getRole()) || "admin".equals(loggedInDoctor.getRole()))) {
             document.add(new Paragraph("Médico a cargo: " + loggedInDoctor.getFirstName() + " " + loggedInDoctor.getLastName()));
         }
-        document.add(new Paragraph(" ")); // Salto de linea
+        // salto de linea
+        document.add(new Paragraph(" "));
 
-        // Configurar una tabla con 5 columnas
+        // tabla con 5 columnas
         float[] columnWidths = {130f, 100f, 60f, 80f, 80f};
         Table table = new Table(columnWidths);
 
-        // Dibujar los encabezados de la tabla
+        // encabezados de la tabla
         table.addHeaderCell("Fecha y Hora");
         table.addHeaderCell("Presión (Sis/Dia)");
         table.addHeaderCell("Pulso");
         table.addHeaderCell("Glucosa");
         table.addHeaderCell("Peso (kg)");
 
-        // Iterar sobre las metricas y agregarlas como filas a la tabla
+        // iteramos sobre las metricas y las metemos como filas
         for (Metric m : history) {
             String date = m.getTimestamp() != null ? m.getTimestamp().toDate().toString() : "N/A";
             String bp = (m.getSystolic() != null && m.getDiastolic() != null) ? m.getSystolic() + "/" + m.getDiastolic() : "-";
@@ -202,10 +197,9 @@ public class ReportsController {
             table.addCell(weight);
         }
 
-        // Insertar la tabla en el documento
         document.add(table);
 
-        // Insertar los graficos embebidos si estan disponibles
+        // insertamos los graficos embebidos si estan disponibles
         if (chartImages != null && !chartImages.isEmpty()) {
             document.add(new Paragraph(" "));
             document.add(new Paragraph("Gráficos del Historial Clínico").setBold().setFontSize(14));
@@ -218,14 +212,14 @@ public class ReportsController {
             }
         }
 
-        // Sección: Alertas detectadas
+        // seccion alertas detectadas
         document.add(new Paragraph(" "));
         document.add(new Paragraph("Alertas Detectadas")
                 .setBold().setFontSize(14));
         document.add(new Paragraph(alertsText != null ? alertsText : "Sin alertas.")
                 .setFontSize(11));
 
-        //Sección: Recomendaciones Clínicas
+        // seccion recomendaciones clinicas
         document.add(new Paragraph(" "));
         document.add(new Paragraph("Recomendaciones Clínicas")
                 .setBold().setFontSize(14));
@@ -237,11 +231,11 @@ public class ReportsController {
         document.close();
     }
 
-    // genera los graficos de presion arterial y promedios como imagenes PNG para el PDF
+    // genera los graficos de presion y promedios como png para meter al pdf
     private List<byte[]> buildChartImages(List<Metric> history) {
         List<byte[]> images = new ArrayList<>();
 
-        // Gráfico presión arterial
+        // grafico de presion arterial
         try {
             CategoryAxis xAxis = new CategoryAxis();
             NumberAxis yAxis = new NumberAxis();
@@ -250,13 +244,13 @@ public class ReportsController {
             lineChart.setAnimated(false);
             lineChart.setPrefSize(620, 280);
 
-            //Descripciones sistolica y diastolica
+            // series sistolica y diastolica
             XYChart.Series<String, Number> systolicSeries = new XYChart.Series<>();
             systolicSeries.setName("Sistólica");
             XYChart.Series<String, Number> diastolicSeries = new XYChart.Series<>();
             diastolicSeries.setName("Diastólica");
 
-            // Llenar las descripciones con datos (en orden inverso para mostrar antiguos a la izquierda)
+            // llenamos las series al reves para que los antiguos queden a la izquierda
             for (int i = history.size() - 1; i >= 0; i--) {
                 Metric m = history.get(i);
                 if (m.getSystolic() != null && m.getDiastolic() != null && m.getTimestamp() != null) {
@@ -274,7 +268,7 @@ public class ReportsController {
             System.err.println("Error generando gráfico de línea: " + e.getMessage());
         }
 
-        // Gráfico de barras para promedios
+        // grafico de barras con los promedios
         try {
             CategoryAxis xAxis2 = new CategoryAxis();
             NumberAxis yAxis2 = new NumberAxis();
@@ -286,7 +280,7 @@ public class ReportsController {
             XYChart.Series<String, Number> avgSeries = new XYChart.Series<>();
             avgSeries.setName("Promedio");
 
-            // Delegamos el conteo y suma a MetricUtils — sólo agregamos los promedios con dato
+            // delegamos el conteo y suma a MetricUtils solo agregamos los promedios con dato
             MetricUtils.Averages avg = MetricUtils.computeAverages(history);
             if (avg.systolicAvg  != null) avgSeries.getData().add(new XYChart.Data<>("Sistólica",   avg.systolicAvg));
             if (avg.diastolicAvg != null) avgSeries.getData().add(new XYChart.Data<>("Diastólica",  avg.diastolicAvg));
@@ -305,11 +299,11 @@ public class ReportsController {
         return images;
     }
 
-    // convierte un nodo de javafx a imagen PNG tomandole una captura de pantalla
+    // convierte un nodo de javafx a png tomandole una captura
     private byte[] snapshotNodeToBytes(javafx.scene.Node node, double width, double height) {
         try {
             StackPane wrapper = new StackPane(node);
-            // Colocar el nodo dentro de una escena activa la aplicación de CSS
+            // meter el nodo en una escena activa la aplicacion del css
             javafx.scene.Scene tempScene = new javafx.scene.Scene(wrapper, width, height);
             node.applyCss();
             wrapper.layout();
@@ -317,7 +311,7 @@ public class ReportsController {
             SnapshotParameters params = new SnapshotParameters();
             WritableImage writableImage = node.snapshot(params, null);
 
-            // Convertir la imagen de JavaFX a BufferedImage de Swing
+            // pasamos la imagen de javafx a BufferedImage de swing
             BufferedImage bufferedImage = SwingFXUtils.fromFXImage(writableImage, null);
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             ImageIO.write(bufferedImage, "png", baos);
@@ -329,7 +323,7 @@ public class ReportsController {
         }
     }
 
-    //Exporta el historial clínico a un archivo Excel (.xlsx) con formato
+    // exporta el historial clinico a un xlsx con formato
     @FXML
     protected void onExportExcel() {
         User selectedPatient = comboPatients.getValue();
@@ -340,7 +334,7 @@ public class ReportsController {
             return;
         }
 
-        // Abrir cuadro de diálogo para elegir dónde guardar el archivo
+        // abrimos el dialogo para elegir donde guardar el archivo
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Guardar Reporte Clínico en Excel");
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Archivos Excel", "*.xlsx"));
@@ -353,7 +347,7 @@ public class ReportsController {
             lblStatus.setText("Generando archivo Excel...");
             lblStatus.setTextFill(javafx.scene.paint.Color.WHITE);
 
-            // Generar el archivo en hilo de fondo
+            // generamos el archivo en hilo de fondo
             new Thread(() -> {
                 try {
                     List<Metric> history = getMetricsByPatientId(selectedPatient.getUid());
@@ -364,7 +358,7 @@ public class ReportsController {
                         lblStatus.setTextFill(javafx.scene.paint.Color.GREEN);
                     });
                 } catch (java.io.FileNotFoundException e) {
-                    // Windows lanza FileNotFoundException cuando el archivo está abierto en Excel
+                    // Windows lanza FileNotFoundException si el archivo esta abierto en Excel
                     Platform.runLater(() -> {
                         lblStatus.setText("Cierra el archivo en Excel y vuelve a intentarlo");
                         lblStatus.setTextFill(javafx.scene.paint.Color.RED);
@@ -381,33 +375,32 @@ public class ReportsController {
         }
     }
 
-    // construye el Excel con Apache POI incluyendo la informacion del paciente y sus metricas
-    // try-with-resources garantiza que el workbook se cierre aun si ocurre una excepcion al escribir
+    // construye el xlsx con Apache POI con info del paciente y sus metricas el try-with-resources cierra el workbook aunque truene la escritura
     private void generateExcel(String destPath, User patient, List<Metric> history) throws Exception {
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Historial Clínico");
 
-            // Estilo para los encabezados
+            // estilo para los encabezados
             CellStyle headerStyle = workbook.createCellStyle();
             Font font = workbook.createFont();
             font.setBold(true);
             headerStyle.setFont(font);
 
-            // Informacion del paciente
+            // info del paciente
             Row titleRow = sheet.createRow(0);
             titleRow.createCell(0).setCellValue("Reporte Clínico - HealthTrack Community");
 
             Row patientRow = sheet.createRow(1);
             patientRow.createCell(0).setCellValue("Paciente: " + patient.getFirstName() + " " + patient.getLastName());
 
-            // Información del médico si está disponible
+            // info del medico si esta disponible
             if (loggedInDoctor != null
                     && ("doctor".equals(loggedInDoctor.getRole()) || "admin".equals(loggedInDoctor.getRole()))) {
                 Row doctorRow = sheet.createRow(2);
                 doctorRow.createCell(0).setCellValue("Médico a cargo: " + loggedInDoctor.getFirstName() + " " + loggedInDoctor.getLastName());
             }
 
-            // Encabezados de la tabla
+            // encabezados de la tabla
             Row headerRow = sheet.createRow(4);
             String[] columns = {"Fecha y Hora", "Presión (Sis/Dia)", "Pulso", "Glucosa", "Peso (kg)"};
             for (int i = 0; i < columns.length; i++) {
@@ -416,7 +409,7 @@ public class ReportsController {
                 cell.setCellStyle(headerStyle);
             }
 
-            // Llenado de datos
+            // llenado de datos
             int rowNum = 5;
             for (Metric m : history) {
                 Row row = sheet.createRow(rowNum++);
@@ -434,33 +427,32 @@ public class ReportsController {
                 row.createCell(4).setCellValue(weight);
             }
 
-            // Ajuste automatico del ancho de las columnas
+            // ajuste automatico del ancho de las columnas
             for (int i = 0; i < columns.length; i++) {
                 sheet.autoSizeColumn(i);
             }
 
-            // Escritura del archivo fisico
+            // escritura del archivo fisico
             try (FileOutputStream fileOut = new FileOutputStream(destPath)) {
                 workbook.write(fileOut);
             }
         }
     }
 
-    // Obtiene el historial de métricas de un paciente y lo ordena por fecha
+    // trae el historial de metricas del paciente ordenado por fecha
     private List<Metric> getMetricsByPatientId(String patientId) throws Exception {
         List<Metric> metrics = metricDao.getByField("patientId", patientId);
         MetricUtils.sortByTimestampDesc(metrics);
         return metrics;
     }
 
-    // Obtiene el análisis clínico más reciente guardado en Firestore para el paciente
-    // Excluye las notas manuales del médico (type = "note") — solo trae análisis automáticos
+    // trae el analisis clinico mas reciente guardado en firestore excluye notas manuales del medico solo trae analisis automaticos
     private String fetchLatestRecommendation(String patientId) {
         try {
             List<Recommendation> all = recommendationDao.getByField("patientId", patientId);
             Recommendation latest = null;
             for (Recommendation r : all) {
-                // Solo consideramos análisis automáticos, no notas del médico
+                // solo consideramos los analisis automaticos no las notas del medico
                 if ("note".equals(r.getType())) continue;
                 if (latest == null) {
                     latest = r;

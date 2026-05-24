@@ -1,43 +1,27 @@
 package com.itc.healthtrack.models;
 
+// usuario del sistema puede ser paciente medico o admin
 public class User {
 
-    // Identificador único del usuario
     private String uid;
-
-    // Correo electrónico del usuario, también usado como identificador en Firebase Auth
     private String email;
-
-    // Nombre del usuario
     private String firstName;
-
-    // Apellido(s) del usuario
     private String lastName;
-
-    // Rol dentro del sistema: "patient", "doctor" o "admin"
+    // rol patient doctor o admin
     private String role;
 
-    // Campos exclusivos para pacientes
-
-    // Fecha de nacimiento almacenada como texto para simplicidad en FXML (ej: "2000-01-15")
+    // campos exclusivos de pacientes
+    // fecha de nacimiento como texto para simplicidad en FXML ej 2000-01-15
     private String birthDate;
-
-    // Género del paciente: "M", "F" u "Otro"
+    // M F u Otro
     private String gender;
-
-    // Estatura del paciente en metros (ej: 1.75)
+    // estatura en metros
     private Double height;
-
-    // UID del médico asignado a este paciente
     private String assignedDoctorId;
-
-    // Nombre completo del médico asignado (desnormalizado para mostrar en UI sin consulta extra)
+    // nombre del medico desnormalizado para mostrar en la ui sin consulta extra
     private String assignedDoctorName;
 
-    // Constructor vacío requerido por Firestore para deserializar documentos automáticamente
     public User() {}
-
-    // Getters y Setters
 
     public String getUid() { return uid; }
     public void setUid(String uid) { this.uid = uid; }

@@ -102,7 +102,7 @@ public class RegisterController {
             return;
         }
 
-        // validacion de token para roles elevados
+        // checamos el token para los roles elevados
         if ("Doctor".equals(roleLabel)) {
             if (tokenInput.isEmpty()) {
                 showTokenAlert("Se requiere el código de acceso médico para registrarse como Doctor.\n"

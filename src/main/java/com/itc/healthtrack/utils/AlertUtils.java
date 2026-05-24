@@ -4,17 +4,12 @@ import com.itc.healthtrack.models.Metric;
 
 import java.util.List;
 
-// Utilidad para construir el texto de alertas clínicas a partir del historial del paciente.
-// Centraliza los umbrales que antes estaban duplicados en ReportsController
-// y RecommendationsController, garantizando consistencia entre ambos reportes.
+// utilidad para construir el texto de alertas clinicas a partir del historial del paciente centraliza los umbrales para que ReportsController y RecommendationsController den el mismo resultado
 public class AlertUtils {
 
-    // Constructor privado: clase de utilidad, no se instancia
     private AlertUtils() {}
 
-    // Construye un texto con las alertas activas a partir de la última métrica del paciente.
-    // Evalúa presión arterial, glucosa, frecuencia cardíaca e IMC con umbrales clínicos estándar.
-    // La lista debe venir ordenada de más reciente a más antigua (usar MetricUtils.sortByTimestampDesc).
+    // arma el texto de alertas activas a partir de la metrica mas reciente evalua presion glucosa frecuencia cardiaca e imc la lista debe venir ordenada desc
     public static String buildAlertsText(List<Metric> history) {
         if (history == null || history.isEmpty()) {
             return "Sin métricas registradas — no se pueden calcular alertas.";
@@ -23,7 +18,7 @@ public class AlertUtils {
         Metric latest = history.get(0);
         StringBuilder sb = new StringBuilder();
 
-        // Presión arterial
+        // presion arterial
         if (latest.getSystolic() != null && latest.getDiastolic() != null) {
             int sys = latest.getSystolic();
             int dia = latest.getDiastolic();
@@ -39,7 +34,7 @@ public class AlertUtils {
             }
         }
 
-        // Glucosa
+        // glucosa
         if (latest.getGlucoseLevel() != null) {
             double gluc = latest.getGlucoseLevel();
             if (gluc > 300) {
@@ -52,7 +47,7 @@ public class AlertUtils {
             }
         }
 
-        // Frecuencia cardíaca
+        // frecuencia cardiaca
         if (latest.getHeartRate() != null) {
             int hr = latest.getHeartRate();
             if (hr > 120) {
@@ -62,7 +57,7 @@ public class AlertUtils {
             }
         }
 
-        // Índice de masa corporal
+        // indice de masa corporal
         if (latest.getBmi() != null) {
             double bmi = latest.getBmi();
             if (bmi >= 40) {

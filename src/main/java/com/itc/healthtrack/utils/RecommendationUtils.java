@@ -6,16 +6,12 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-// Utilidad para operaciones comunes sobre listas de recomendaciones.
-// Centraliza el ordenamiento por fecha que antes estaba duplicado en
-// RecommendationsController y ReportsController.
+// utilidad para listas de recomendaciones centraliza el orden por fecha que antes estaba duplicado en RecommendationsController y ReportsController
 public class RecommendationUtils {
 
-    // Constructor privado: clase de utilidad, no se instancia
     private RecommendationUtils() {}
 
-    // Ordena la lista de recomendaciones de la más reciente a la más antigua.
-    // Las entradas sin fecha se colocan al final.
+    // ordena las recomendaciones de mas reciente a mas antigua las que no tienen fecha van al final
     public static void sortByDateDesc(List<Recommendation> recommendations) {
         Collections.sort(recommendations, new Comparator<Recommendation>() {
             @Override

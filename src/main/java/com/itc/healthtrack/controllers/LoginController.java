@@ -31,18 +31,18 @@ import java.util.List;
 // tiene dos formularios uno para pacientes y admin y otro exclusivo para medicos con token
 public class LoginController {
 
-    // Credenciales REST API
+    // credenciales rest api de firebase
     private static final String FIREBASE_WEB_API_KEY   = "AIzaSyBOlSDOZdQMwxy6Ev9t2hUbcV3PiB_4paI";
     private static final String FIREBASE_SIGN_IN_URL   =
             "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key="
             + FIREBASE_WEB_API_KEY;
 
-    // Formulario PACIENTE
+    // formulario paciente
     @FXML private TextField     emailField;
     @FXML private PasswordField passwordField;
     @FXML private Button        loginButton;
     @FXML private Label         errorLabel;
-    // Formularios alternos
+    // formularios alternos
     @FXML private VBox          patientForm;       // visible por defecto
     @FXML private VBox          doctorPanel;       // reemplaza al anterior
     @FXML private Button        btnToggleDoctor;
@@ -70,8 +70,7 @@ public class LoginController {
         }
     }
 
-    // Navegación a registro
-
+    // navegacion a registro
     @FXML
     protected void onGoToRegister(ActionEvent event) {
         try {
@@ -82,7 +81,7 @@ public class LoginController {
             scene.getStylesheets().add(getClass().getResource("/css/main.css").toExternalForm());
             Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
             stage.setScene(scene);
-            // Mantener pantalla completa al navegar al registro
+            // mantener pantalla completa al navegar al registro
             stage.setFullScreen(true);
             stage.setFullScreenExitKeyCombination(javafx.scene.input.KeyCombination.NO_MATCH);
         } catch (IOException e) {
@@ -91,8 +90,7 @@ public class LoginController {
         }
     }
 
-    // LOGIN
-
+    // login del paciente
     @FXML
     protected void onLoginButtonClick(ActionEvent event) {
         String email    = emailField.getText().trim();
@@ -108,10 +106,10 @@ public class LoginController {
 
         new Thread(() -> {
             try {
-                // Paso 1: autenticar con Firebase Auth REST API
+                // autenticamos con firebase auth rest api
                 String localId = signInWithEmailAndPassword(email, password);
 
-                // Paso 2: obtener perfil de Firestore (devuelve null si falla y avisa al usuario)
+                // traemos el perfil de firestore devuelve null si falla y avisa al usuario
                 User currentUser = loadProfileSafely(localId, loginButton);
                 if (currentUser == null) return;
 
@@ -143,7 +141,7 @@ public class LoginController {
         }).start();
     }
 
-    // LOGIN
+    // login del medico
     @FXML
     protected void onDoctorLoginButtonClick(ActionEvent event) {
         String email    = doctorEmailField.getText().trim();
@@ -165,10 +163,10 @@ public class LoginController {
 
         new Thread(() -> {
             try {
-                // autenticar con Firebase Auth REST API
+                // autenticamos con firebase auth rest api
                 String localId = signInWithEmailAndPassword(email, password);
 
-                // obtener perfil de Firestore (devuelve null si falla y avisa al usuario)
+                // traemos el perfil de firestore devuelve null si falla y avisa al usuario
                 User currentUser = loadProfileSafely(localId, doctorLoginButton);
                 if (currentUser == null) return;
 
@@ -194,8 +192,7 @@ public class LoginController {
         }).start();
     }
 
-    // Auto-asignación de médico para pacientes sin asignación
-
+    // si el paciente no tiene medico asignado le asignamos uno al vuelo
     private void autoAssignDoctorIfNeeded(User patient, ActionEvent event) {
         boolean needsDoctor = patient.getAssignedDoctorId() == null
                 || patient.getAssignedDoctorId().isEmpty();
@@ -220,14 +217,10 @@ public class LoginController {
         }).start();
     }
 
-    // -------------------------------------------------------------------
-    // Autenticación — Firebase Identity Toolkit REST API
-    // usamos gson para construir el json y navegar la respuesta de error de firebase
-    // -------------------------------------------------------------------
-
+    // autenticacion contra firebase identity toolkit rest api usamos Gson para armar el json y leer el error
     private String signInWithEmailAndPassword(String email, String password) throws Exception {
 
-        // 1. Construir body con Gson (escapa caracteres especiales)
+        // armamos el body con Gson para escapar caracteres especiales
         JsonObject body = new JsonObject();
         body.addProperty("email",             email);
         body.addProperty("password",          password);
@@ -249,7 +242,7 @@ public class LoginController {
         int responseCode = http.getResponseCode();
 
         if (responseCode == HttpURLConnection.HTTP_OK) {
-            // 2a. Éxito: extraer localId con Gson
+            // exito extraemos el localId con Gson
             String responseJson = readStream(http.getInputStream());
             try {
                 String localId = JsonParser.parseString(responseJson)
@@ -264,7 +257,7 @@ public class LoginController {
                 throw new Exception("Respuesta inesperada de Firebase: " + responseJson, e);
             }
         } else {
-            // 2b. Error: parsear mensaje de Firebase con Gson
+            // error parseamos el mensaje de firebase con Gson
             String errorJson   = readStream(http.getErrorStream());
             System.err.println("[LoginController] Firebase error HTTP " + responseCode + ": " + errorJson);
             String errorCode   = extractFirebaseErrorCode(errorJson);
@@ -278,7 +271,7 @@ public class LoginController {
             JsonObject root  = JsonParser.parseString(errorJson).getAsJsonObject();
             JsonObject error = root.getAsJsonObject("error");
             if (error != null && error.has("message")) {
-                // Firebase a veces añade detalle tras un espacio: "INVALID_EMAIL : ..."
+                // firebase a veces agrega detalle despues de un espacio ej INVALID_EMAIL ...
                 return error.get("message").getAsString().split("\\s")[0];
             }
         } catch (Exception e) {
@@ -324,8 +317,7 @@ public class LoginController {
         }
     }
 
-    // Navegación al Dashboard
-
+    // carga el dashboard despues de un login exitoso
     private void loadDashboard(ActionEvent event, User user) {
         try {
             FXMLLoader fxmlLoader = new FXMLLoader(
@@ -339,7 +331,7 @@ public class LoginController {
 
             Stage stage = (Stage) ((Node) event.getSource()).getScene().getWindow();
             stage.setScene(scene);
-            // Mantener pantalla completa al entrar al dashboard
+            // mantener pantalla completa al entrar al dashboard
             stage.setFullScreen(true);
             stage.setFullScreenExitKeyCombination(javafx.scene.input.KeyCombination.NO_MATCH);
         } catch (IOException e) {
@@ -348,18 +340,13 @@ public class LoginController {
         }
     }
 
-    // -------------------------------------------------------------------
-    // UI helpers
-    // -------------------------------------------------------------------
-
+    // helpers de ui
     private void showError(String message) {
         errorLabel.setText(message);
         errorLabel.setVisible(true);
     }
 
-    // Carga el perfil del usuario desde Firestore tras autenticar.
-    // Si el documento no existe o ocurre un error, muestra el aviso al usuario,
-    // reactiva el botón de inicio de sesión y devuelve null.
+    // trae el perfil del usuario tras autenticar si no existe o falla avisa al usuario reactiva el boton y regresa null
     private User loadProfileSafely(String uid, Button button) {
         try {
             User profile = userDAO.getById(uid);
@@ -382,8 +369,7 @@ public class LoginController {
         }
     }
 
-    // Muestra un mensaje de error y reactiva el botón en el hilo de la interfaz.
-    // Centraliza el patrón usado en los dos flujos de inicio de sesión.
+    // muestra el error y reactiva el boton en el hilo fx evita duplicar codigo en los dos flujos de login
     private void showLoginError(Button button, String message) {
         Platform.runLater(() -> {
             showError(message);
@@ -391,7 +377,7 @@ public class LoginController {
         });
     }
 
-    // Excepción interna: distingue errores de Auth (mensaje conocido) de errores de red
+    // excepcion interna para distinguir errores de auth con mensaje conocido de los errores de red
     private static class FirebaseLoginException extends Exception {
         public FirebaseLoginException(String message) { super(message); }
     }
