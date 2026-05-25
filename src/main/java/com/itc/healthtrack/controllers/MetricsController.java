@@ -6,8 +6,6 @@ import com.itc.healthtrack.models.Metric;
 import com.itc.healthtrack.models.User;
 import com.itc.healthtrack.services.NotificationService;
 import com.itc.healthtrack.services.UserService;
-import com.itc.healthtrack.utils.DialogUtils;
-import com.itc.healthtrack.utils.MetricUtils;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -200,7 +198,7 @@ public class MetricsController {
     // calcula y muestra los promedios de presion glucosa y peso para el periodo visible
     private void calculateAverages(List<Metric> data) {
         // delegamos el calculo a MetricUtils solo armamos las etiquetas con el resultado
-        MetricUtils.Averages avg = MetricUtils.computeAverages(data);
+        Averages avg = computeAverages(data);
 
         if (avg.systolicAvg != null && avg.diastolicAvg != null) {
             // mostramos la presion como enteros porque mmHg no usa decimales en clinica
@@ -251,7 +249,7 @@ public class MetricsController {
         avgSeries.setName("Promedio del período");
 
         // delegamos el conteo y suma a MetricUtils solo agregamos los promedios con dato
-        MetricUtils.Averages avg = MetricUtils.computeAverages(history);
+        Averages avg = computeAverages(history);
         if (avg.systolicAvg  != null) avgSeries.getData().add(new XYChart.Data<>("Sistólica",   avg.systolicAvg));
         if (avg.diastolicAvg != null) avgSeries.getData().add(new XYChart.Data<>("Diastólica",  avg.diastolicAvg));
         if (avg.heartRateAvg != null) avgSeries.getData().add(new XYChart.Data<>("F. Cardíaca", avg.heartRateAvg));
@@ -396,7 +394,7 @@ public class MetricsController {
             alert.setTitle("Alerta Clínica — HealthTrack");
             alert.setHeaderText("Se detectaron valores fuera del rango clínico normal");
             alert.setContentText(message);
-            DialogUtils.applyWhiteStyle(alert.getDialogPane());
+            applyWhiteStyle(alert.getDialogPane());
             alert.showAndWait();
 
             lblStatus.setText("Valores críticos detectados, revisa la alerta");
@@ -480,7 +478,105 @@ public class MetricsController {
     // trae el historial de metricas del paciente y lo ordena por fecha
     private List<Metric> getMetricsByPatientId(String patientId) throws Exception {
         List<Metric> metrics = metricDao.getByField("patientId", patientId);
-        MetricUtils.sortByTimestampDesc(metrics);
+        sortByTimestampDesc(metrics);
         return metrics;
+    }
+
+    // aplica el estilo blanco al panel del dialogo
+    private static void applyWhiteStyle(DialogPane dp) {
+        // fondo blanco
+        dp.setStyle("-fx-background-color: #ffffff; -fx-font-size: 13px;");
+
+        // texto del contenido en oscuro
+        javafx.scene.Node content = dp.lookup(".content.label");
+        if (content != null) {
+            content.setStyle("-fx-text-fill: #222222; -fx-font-size: 13px;");
+        }
+
+        // encabezado en gris claro
+        javafx.scene.Node header = dp.lookup(".header-panel");
+        if (header != null) {
+            header.setStyle("-fx-background-color: #f5f5f5;");
+        }
+
+        // texto del encabezado en negro
+        javafx.scene.Node headerLabel = dp.lookup(".header-panel .label");
+        if (headerLabel != null) {
+            headerLabel.setStyle("-fx-text-fill: #111111; -fx-font-weight: bold;");
+        }
+
+        // botones azul para confirmar y gris para cancelar
+        for (ButtonType bt : dp.getButtonTypes()) {
+            javafx.scene.Node node = dp.lookupButton(bt);
+            if (node instanceof Button) {
+                Button btn = (Button) node;
+                boolean isCancel = (bt == ButtonType.CANCEL
+                        || bt == ButtonType.NO
+                        || bt == ButtonType.CLOSE);
+                String color = isCancel ? "#9e9e9e" : "#2196f3";
+                btn.setStyle("-fx-background-color: " + color
+                        + "; -fx-text-fill: #ffffff; -fx-cursor: hand;"
+                        + " -fx-padding: 6 22; -fx-background-radius: 4;");
+            }
+        }
+    }
+
+    // ordena las metricas de mas reciente a mas antigua las que no tienen timestamp van al final
+    private static void sortByTimestampDesc(List<Metric> metrics) {
+        metrics.sort((a, b) -> {
+            if (a.getTimestamp() == null && b.getTimestamp() == null) return 0;
+            if (a.getTimestamp() == null) return 1;
+            if (b.getTimestamp() == null) return -1;
+            return b.getTimestamp().compareTo(a.getTimestamp());
+        });
+    }
+
+    // calcula los promedios de las cinco metricas principales devuelve null en los campos sin datos la presion solo cuenta cuando sistolica y diastolica estan presentes
+    private static Averages computeAverages(List<Metric> data) {
+        Averages result = new Averages();
+        if (data == null || data.isEmpty()) return result;
+
+        int sysTotal = 0, diaTotal = 0, hrTotal = 0;
+        double glTotal = 0, weightTotal = 0;
+        int bpCount = 0, hrCount = 0, glCount = 0, weightCount = 0;
+
+        for (Metric m : data) {
+            // sistolica y diastolica solo cuentan cuando ambas vienen juntas
+            if (m.getSystolic() != null && m.getDiastolic() != null) {
+                sysTotal += m.getSystolic();
+                diaTotal += m.getDiastolic();
+                bpCount++;
+            }
+            if (m.getHeartRate() != null) {
+                hrTotal += m.getHeartRate();
+                hrCount++;
+            }
+            if (m.getGlucoseLevel() != null) {
+                glTotal += m.getGlucoseLevel();
+                glCount++;
+            }
+            if (m.getWeight() != null) {
+                weightTotal += m.getWeight();
+                weightCount++;
+            }
+        }
+
+        if (bpCount > 0) {
+            result.systolicAvg  = sysTotal / (double) bpCount;
+            result.diastolicAvg = diaTotal / (double) bpCount;
+        }
+        if (hrCount > 0)     result.heartRateAvg = hrTotal     / (double) hrCount;
+        if (glCount > 0)     result.glucoseAvg   = glTotal     / glCount;
+        if (weightCount > 0) result.weightAvg    = weightTotal / weightCount;
+        return result;
+    }
+
+    // contenedor con los promedios calculados un campo null significa que no habia datos
+    private static class Averages {
+        public Double systolicAvg;
+        public Double diastolicAvg;
+        public Double heartRateAvg;
+        public Double glucoseAvg;
+        public Double weightAvg;
     }
 }

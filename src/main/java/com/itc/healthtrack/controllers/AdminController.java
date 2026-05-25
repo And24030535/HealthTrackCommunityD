@@ -2,7 +2,6 @@ package com.itc.healthtrack.controllers;
 
 import com.itc.healthtrack.dao.GenericDAO;
 import com.itc.healthtrack.models.User;
-import com.itc.healthtrack.utils.DialogUtils;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -269,7 +268,7 @@ public class AdminController {
         dp.setHeader(null);
         dp.setGraphic(null);
         dp.getButtonTypes().add(ButtonType.CLOSE);
-        DialogUtils.applyWhiteStyle(dp);
+        applyWhiteStyle(dp);
 
         dialog.showAndWait();
     }
@@ -355,7 +354,7 @@ public class AdminController {
             blocked.setHeaderText("El Dr. " + doctorName + " tiene " + patients.size() + " paciente(s) asignado(s)");
             blocked.setContentText("No hay otros médicos disponibles para recibir los pacientes.\n"
                     + "Registra al menos un médico más antes de intentar esta eliminación.");
-            DialogUtils.applyWhiteStyle(blocked.getDialogPane());
+            applyWhiteStyle(blocked.getDialogPane());
             blocked.showAndWait();
             lblStatus.setText("Eliminación cancelada: no hay médicos disponibles para reasignación.");
             lblStatus.setTextFill(Color.web("#ff9800"));
@@ -393,7 +392,7 @@ public class AdminController {
         dialog.setHeaderText("Reasignar pacientes antes de eliminar al médico");
         dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-        DialogUtils.applyWhiteStyle(dialog.getDialogPane());
+        applyWhiteStyle(dialog.getDialogPane());
 
         dialog.showAndWait().ifPresent(btn -> {
             if (btn != ButtonType.OK) return;
@@ -456,7 +455,7 @@ public class AdminController {
         confirm.setTitle("Confirmar eliminación");
         confirm.setHeaderText("Eliminar al Dr. " + doctorName);
         confirm.setContentText("Este médico no tiene pacientes asignados.\n¿Confirmas la eliminación?");
-        DialogUtils.applyWhiteStyle(confirm.getDialogPane());
+        applyWhiteStyle(confirm.getDialogPane());
 
         confirm.showAndWait().ifPresent(result -> {
             if (result != ButtonType.OK) return;
@@ -492,7 +491,7 @@ public class AdminController {
         confirm.setTitle("Confirmar eliminación");
         confirm.setHeaderText("Eliminar usuario");
         confirm.setContentText("¿Eliminar al usuario " + userName + "?\n\nEsta acción no se puede deshacer.");
-        DialogUtils.applyWhiteStyle(confirm.getDialogPane());
+        applyWhiteStyle(confirm.getDialogPane());
 
         confirm.showAndWait().ifPresent(result -> {
             if (result != ButtonType.OK) return;
@@ -539,7 +538,7 @@ public class AdminController {
         dialog.setTitle("Cambiar Rol");
         dialog.setHeaderText("Usuario: " + selectedUser.getFirstName() + " " + selectedUser.getLastName());
         dialog.setContentText("Selecciona el nuevo rol:");
-        DialogUtils.applyWhiteStyle(dialog.getDialogPane());
+        applyWhiteStyle(dialog.getDialogPane());
 
         dialog.showAndWait().ifPresent(newRoleLabel -> {
             String newRole = getRoleValue(newRoleLabel);
@@ -636,7 +635,7 @@ public class AdminController {
                     dialog.setHeaderText("Asignación de médico al paciente");
                     dialog.getDialogPane().setContent(content);
                     dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-                    DialogUtils.applyWhiteStyle(dialog.getDialogPane());
+                    applyWhiteStyle(dialog.getDialogPane());
 
                     dialog.showAndWait().ifPresent(btn -> {
                         if (btn != ButtonType.OK) return;
@@ -694,6 +693,45 @@ public class AdminController {
         lblTotalUsers.setText(String.valueOf(usersObservableList.size()));
         lblTotalDoctors.setText(String.valueOf(totalDoctors));
         lblTotalPatients.setText(String.valueOf(totalPatients));
+    }
+
+    // aplica el estilo blanco al panel del dialogo
+    private static void applyWhiteStyle(DialogPane dp) {
+        // fondo blanco
+        dp.setStyle("-fx-background-color: #ffffff; -fx-font-size: 13px;");
+
+        // texto del contenido en oscuro
+        javafx.scene.Node content = dp.lookup(".content.label");
+        if (content != null) {
+            content.setStyle("-fx-text-fill: #222222; -fx-font-size: 13px;");
+        }
+
+        // encabezado en gris claro
+        javafx.scene.Node header = dp.lookup(".header-panel");
+        if (header != null) {
+            header.setStyle("-fx-background-color: #f5f5f5;");
+        }
+
+        // texto del encabezado en negro
+        javafx.scene.Node headerLabel = dp.lookup(".header-panel .label");
+        if (headerLabel != null) {
+            headerLabel.setStyle("-fx-text-fill: #111111; -fx-font-weight: bold;");
+        }
+
+        // botones azul para confirmar y gris para cancelar
+        for (ButtonType bt : dp.getButtonTypes()) {
+            javafx.scene.Node node = dp.lookupButton(bt);
+            if (node instanceof Button) {
+                Button btn = (Button) node;
+                boolean isCancel = (bt == ButtonType.CANCEL
+                        || bt == ButtonType.NO
+                        || bt == ButtonType.CLOSE);
+                String color = isCancel ? "#9e9e9e" : "#2196f3";
+                btn.setStyle("-fx-background-color: " + color
+                        + "; -fx-text-fill: #ffffff; -fx-cursor: hand;"
+                        + " -fx-padding: 6 22; -fx-background-radius: 4;");
+            }
+        }
     }
 
 }

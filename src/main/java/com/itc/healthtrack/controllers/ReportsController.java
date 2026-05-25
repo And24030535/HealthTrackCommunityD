@@ -5,8 +5,6 @@ import com.itc.healthtrack.models.Metric;
 import com.itc.healthtrack.models.Recommendation;
 import com.itc.healthtrack.models.User;
 import com.itc.healthtrack.services.UserService;
-import com.itc.healthtrack.utils.AlertUtils;
-import com.itc.healthtrack.utils.MetricUtils;
 import com.itextpdf.io.image.ImageData;
 import com.itextpdf.io.image.ImageDataFactory;
 import com.itextpdf.kernel.pdf.PdfDocument;
@@ -109,7 +107,7 @@ public class ReportsController {
                     List<Metric> history = getMetricsByPatientId(selectedPatient.getUid());
 
                     // calculamos alertas y traemos la ultima recomendacion en el mismo hilo de fondo para no bloquear la ui
-                    String alertsText          = AlertUtils.buildAlertsText(history);
+                    String alertsText          = buildAlertsText(history);
                     String recommendationText  = fetchLatestRecommendation(selectedPatient.getUid());
 
                     Platform.runLater(() -> {
@@ -281,7 +279,7 @@ public class ReportsController {
             avgSeries.setName("Promedio");
 
             // delegamos el conteo y suma a MetricUtils solo agregamos los promedios con dato
-            MetricUtils.Averages avg = MetricUtils.computeAverages(history);
+            Averages avg = computeAverages(history);
             if (avg.systolicAvg  != null) avgSeries.getData().add(new XYChart.Data<>("Sistólica",   avg.systolicAvg));
             if (avg.diastolicAvg != null) avgSeries.getData().add(new XYChart.Data<>("Diastólica",  avg.diastolicAvg));
             if (avg.heartRateAvg != null) avgSeries.getData().add(new XYChart.Data<>("F.Cardíaca",  avg.heartRateAvg));
@@ -442,7 +440,7 @@ public class ReportsController {
     // trae el historial de metricas del paciente ordenado por fecha
     private List<Metric> getMetricsByPatientId(String patientId) throws Exception {
         List<Metric> metrics = metricDao.getByField("patientId", patientId);
-        MetricUtils.sortByTimestampDesc(metrics);
+        sortByTimestampDesc(metrics);
         return metrics;
     }
 
@@ -468,5 +466,134 @@ public class ReportsController {
             System.err.println("[ReportsController] Error al cargar recomendación: " + e.getMessage());
             return "No disponible (error al conectar con la base de datos)";
         }
+    }
+
+    // arma el texto de alertas activas a partir de la metrica mas reciente evalua presion glucosa frecuencia cardiaca e imc la lista debe venir ordenada desc
+    private static String buildAlertsText(List<Metric> history) {
+        if (history == null || history.isEmpty()) {
+            return "Sin métricas registradas — no se pueden calcular alertas.";
+        }
+
+        Metric latest = history.get(0);
+        StringBuilder sb = new StringBuilder();
+
+        // presion arterial
+        if (latest.getSystolic() != null && latest.getDiastolic() != null) {
+            int sys = latest.getSystolic();
+            int dia = latest.getDiastolic();
+            if (sys >= 180 || dia >= 120) {
+                sb.append("• CRÍTICO — Hipertensión en crisis (")
+                  .append(sys).append("/").append(dia).append(" mmHg)\n");
+            } else if (sys >= 140 || dia >= 90) {
+                sb.append("• ALERTA — Hipertensión (")
+                  .append(sys).append("/").append(dia).append(" mmHg)\n");
+            } else if (sys >= 130 || dia >= 80) {
+                sb.append("• AVISO — Prehipertensión (")
+                  .append(sys).append("/").append(dia).append(" mmHg)\n");
+            }
+        }
+
+        // glucosa
+        if (latest.getGlucoseLevel() != null) {
+            double gluc = latest.getGlucoseLevel();
+            if (gluc > 300) {
+                sb.append("• CRÍTICO — Glucosa extrema (").append(gluc)
+                  .append(" mg/dL) — riesgo de cetoacidosis\n");
+            } else if (gluc > 125) {
+                sb.append("• ALERTA — Hiperglucemia (").append(gluc).append(" mg/dL)\n");
+            } else if (gluc < 70) {
+                sb.append("• ALERTA — Hipoglucemia (").append(gluc).append(" mg/dL)\n");
+            }
+        }
+
+        // frecuencia cardiaca
+        if (latest.getHeartRate() != null) {
+            int hr = latest.getHeartRate();
+            if (hr > 120) {
+                sb.append("• ALERTA — Taquicardia (").append(hr).append(" lpm)\n");
+            } else if (hr < 50) {
+                sb.append("• ALERTA — Bradicardia (").append(hr).append(" lpm)\n");
+            }
+        }
+
+        // indice de masa corporal
+        if (latest.getBmi() != null) {
+            double bmi = latest.getBmi();
+            if (bmi >= 40) {
+                sb.append("• ALERTA — Obesidad mórbida (IMC: ").append(bmi).append(")\n");
+            } else if (bmi >= 35) {
+                sb.append("• ALERTA — Obesidad severa (IMC: ").append(bmi).append(")\n");
+            } else if (bmi >= 30) {
+                sb.append("• AVISO — Obesidad clase I (IMC: ").append(bmi).append(")\n");
+            } else if (bmi >= 25) {
+                sb.append("• AVISO — Sobrepeso (IMC: ").append(bmi).append(")\n");
+            } else if (bmi < 18.5) {
+                sb.append("• AVISO — Bajo peso (IMC: ").append(bmi).append(")\n");
+            }
+        }
+
+        if (sb.length() == 0) {
+            return "No se detectaron valores fuera del rango clínico normal.";
+        }
+        return sb.toString().trim();
+    }
+
+    // ordena las metricas de mas reciente a mas antigua las que no tienen timestamp van al final
+    private static void sortByTimestampDesc(List<Metric> metrics) {
+        metrics.sort((a, b) -> {
+            if (a.getTimestamp() == null && b.getTimestamp() == null) return 0;
+            if (a.getTimestamp() == null) return 1;
+            if (b.getTimestamp() == null) return -1;
+            return b.getTimestamp().compareTo(a.getTimestamp());
+        });
+    }
+
+    // calcula los promedios de las cinco metricas principales devuelve null en los campos sin datos la presion solo cuenta cuando sistolica y diastolica estan presentes
+    private static Averages computeAverages(List<Metric> data) {
+        Averages result = new Averages();
+        if (data == null || data.isEmpty()) return result;
+
+        int sysTotal = 0, diaTotal = 0, hrTotal = 0;
+        double glTotal = 0, weightTotal = 0;
+        int bpCount = 0, hrCount = 0, glCount = 0, weightCount = 0;
+
+        for (Metric m : data) {
+            // sistolica y diastolica solo cuentan cuando ambas vienen juntas
+            if (m.getSystolic() != null && m.getDiastolic() != null) {
+                sysTotal += m.getSystolic();
+                diaTotal += m.getDiastolic();
+                bpCount++;
+            }
+            if (m.getHeartRate() != null) {
+                hrTotal += m.getHeartRate();
+                hrCount++;
+            }
+            if (m.getGlucoseLevel() != null) {
+                glTotal += m.getGlucoseLevel();
+                glCount++;
+            }
+            if (m.getWeight() != null) {
+                weightTotal += m.getWeight();
+                weightCount++;
+            }
+        }
+
+        if (bpCount > 0) {
+            result.systolicAvg  = sysTotal / (double) bpCount;
+            result.diastolicAvg = diaTotal / (double) bpCount;
+        }
+        if (hrCount > 0)     result.heartRateAvg = hrTotal     / (double) hrCount;
+        if (glCount > 0)     result.glucoseAvg   = glTotal     / glCount;
+        if (weightCount > 0) result.weightAvg    = weightTotal / weightCount;
+        return result;
+    }
+
+    // contenedor con los promedios calculados un campo null significa que no habia datos
+    private static class Averages {
+        public Double systolicAvg;
+        public Double diastolicAvg;
+        public Double heartRateAvg;
+        public Double glucoseAvg;
+        public Double weightAvg;
     }
 }

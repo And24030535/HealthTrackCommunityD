@@ -10,9 +10,6 @@ import com.itc.healthtrack.models.Recommendation;
 import com.itc.healthtrack.models.User;
 import com.itc.healthtrack.services.NotificationService;
 import com.itc.healthtrack.services.UserService;
-import com.itc.healthtrack.utils.AlertUtils;
-import com.itc.healthtrack.utils.MetricUtils;
-import com.itc.healthtrack.utils.RecommendationUtils;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -41,6 +38,8 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 // controlador de recomendaciones clinicas usa solo GenericDAO para hablar con firestore
@@ -187,8 +186,8 @@ public class RecommendationsController {
                 }
 
                 // ordenamos ambas listas de mas reciente a mas antigua
-                RecommendationUtils.sortByDateDesc(analyses);
-                RecommendationUtils.sortByDateDesc(notes);
+                sortByDateDesc(analyses);
+                sortByDateDesc(notes);
 
                 Platform.runLater(() -> {
                     historyItems.clear();
@@ -320,7 +319,7 @@ public class RecommendationsController {
     // trae todas las metricas del paciente y las ordena de mas reciente a mas antigua
     private List<Metric> getMetricsByPatient(String patientId) throws Exception {
         List<Metric> metrics = metricDAO.getByField("patientId", patientId);
-        MetricUtils.sortByTimestampDesc(metrics);
+        sortByTimestampDesc(metrics);
         return metrics;
     }
 
@@ -778,7 +777,7 @@ public class RecommendationsController {
                 // juntamos todos los datos para las tres hojas
                 List<Metric>         metricas = getMetricsByPatient(selected.getUid());
                 List<Recommendation> recs     = getRecommendationsByPatient(selected.getUid());
-                String               alertas  = AlertUtils.buildAlertsText(metricas);
+                String               alertas  = buildAlertsText(metricas);
 
                 generateExcel(archivo, diagnostico, alertas, metricas, recs);
 
@@ -810,7 +809,7 @@ public class RecommendationsController {
         for (Recommendation r : todas) {
             if (!"note".equals(r.getType())) analisis.add(r);
         }
-        RecommendationUtils.sortByDateDesc(analisis);
+        sortByDateDesc(analisis);
         return analisis;
     }
 
@@ -952,5 +951,98 @@ public class RecommendationsController {
                 workbook.write(salida);
             }
         }
+    }
+
+    // arma el texto de alertas activas a partir de la metrica mas reciente evalua presion glucosa frecuencia cardiaca e imc la lista debe venir ordenada desc
+    private static String buildAlertsText(List<Metric> history) {
+        if (history == null || history.isEmpty()) {
+            return "Sin métricas registradas — no se pueden calcular alertas.";
+        }
+
+        Metric latest = history.get(0);
+        StringBuilder sb = new StringBuilder();
+
+        // presion arterial
+        if (latest.getSystolic() != null && latest.getDiastolic() != null) {
+            int sys = latest.getSystolic();
+            int dia = latest.getDiastolic();
+            if (sys >= 180 || dia >= 120) {
+                sb.append("• CRÍTICO — Hipertensión en crisis (")
+                  .append(sys).append("/").append(dia).append(" mmHg)\n");
+            } else if (sys >= 140 || dia >= 90) {
+                sb.append("• ALERTA — Hipertensión (")
+                  .append(sys).append("/").append(dia).append(" mmHg)\n");
+            } else if (sys >= 130 || dia >= 80) {
+                sb.append("• AVISO — Prehipertensión (")
+                  .append(sys).append("/").append(dia).append(" mmHg)\n");
+            }
+        }
+
+        // glucosa
+        if (latest.getGlucoseLevel() != null) {
+            double gluc = latest.getGlucoseLevel();
+            if (gluc > 300) {
+                sb.append("• CRÍTICO — Glucosa extrema (").append(gluc)
+                  .append(" mg/dL) — riesgo de cetoacidosis\n");
+            } else if (gluc > 125) {
+                sb.append("• ALERTA — Hiperglucemia (").append(gluc).append(" mg/dL)\n");
+            } else if (gluc < 70) {
+                sb.append("• ALERTA — Hipoglucemia (").append(gluc).append(" mg/dL)\n");
+            }
+        }
+
+        // frecuencia cardiaca
+        if (latest.getHeartRate() != null) {
+            int hr = latest.getHeartRate();
+            if (hr > 120) {
+                sb.append("• ALERTA — Taquicardia (").append(hr).append(" lpm)\n");
+            } else if (hr < 50) {
+                sb.append("• ALERTA — Bradicardia (").append(hr).append(" lpm)\n");
+            }
+        }
+
+        // indice de masa corporal
+        if (latest.getBmi() != null) {
+            double bmi = latest.getBmi();
+            if (bmi >= 40) {
+                sb.append("• ALERTA — Obesidad mórbida (IMC: ").append(bmi).append(")\n");
+            } else if (bmi >= 35) {
+                sb.append("• ALERTA — Obesidad severa (IMC: ").append(bmi).append(")\n");
+            } else if (bmi >= 30) {
+                sb.append("• AVISO — Obesidad clase I (IMC: ").append(bmi).append(")\n");
+            } else if (bmi >= 25) {
+                sb.append("• AVISO — Sobrepeso (IMC: ").append(bmi).append(")\n");
+            } else if (bmi < 18.5) {
+                sb.append("• AVISO — Bajo peso (IMC: ").append(bmi).append(")\n");
+            }
+        }
+
+        if (sb.length() == 0) {
+            return "No se detectaron valores fuera del rango clínico normal.";
+        }
+        return sb.toString().trim();
+    }
+
+    // ordena las metricas de mas reciente a mas antigua las que no tienen timestamp van al final
+    private static void sortByTimestampDesc(List<Metric> metrics) {
+        metrics.sort((a, b) -> {
+            if (a.getTimestamp() == null && b.getTimestamp() == null) return 0;
+            if (a.getTimestamp() == null) return 1;
+            if (b.getTimestamp() == null) return -1;
+            return b.getTimestamp().compareTo(a.getTimestamp());
+        });
+    }
+
+    // ordena las recomendaciones de mas reciente a mas antigua las que no tienen fecha van al final
+    private static void sortByDateDesc(List<Recommendation> recommendations) {
+        Collections.sort(recommendations, new Comparator<Recommendation>() {
+            @Override
+            public int compare(Recommendation a, Recommendation b) {
+                if (a.getGeneratedAt() == null && b.getGeneratedAt() == null) return 0;
+                if (a.getGeneratedAt() == null) return 1;
+                if (b.getGeneratedAt() == null) return -1;
+                return b.getGeneratedAt().compareTo(a.getGeneratedAt());
+            }
+        });
     }
 }
